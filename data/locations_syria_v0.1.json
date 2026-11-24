@@ -1,0 +1,21 @@
+{
+  "schema_version": "0.1.0",
+  "description": "نقاط مرجعية أولية لعواصم المحافظات السورية أو أقرب مركز حضري؛ يجب تعديلها لاحقًا إلى إحداثيات الحقل الفعلية.",
+  "units": {"latitude": "degree", "longitude": "degree", "elevation": "m"},
+  "records": [
+    {"id":"damascus","name_ar":"دمشق","reference_ar":"مدينة دمشق","latitude":33.5138,"longitude":36.2765,"elevation_m":1072.05},
+    {"id":"rif_dimashq","name_ar":"ريف دمشق","reference_ar":"دوما / نقطة مرجعية للريف","latitude":33.5717,"longitude":36.4020,"elevation_m":690},
+    {"id":"aleppo","name_ar":"حلب","reference_ar":"مدينة حلب","latitude":36.2021,"longitude":37.1343,"elevation_m":390},
+    {"id":"homs","name_ar":"حمص","reference_ar":"مدينة حمص","latitude":34.7324,"longitude":36.7137,"elevation_m":500},
+    {"id":"hama","name_ar":"حماة","reference_ar":"مدينة حماة","latitude":35.1318,"longitude":36.7578,"elevation_m":280},
+    {"id":"latakia","name_ar":"اللاذقية","reference_ar":"مدينة اللاذقية","latitude":35.5317,"longitude":35.7918,"elevation_m":20},
+    {"id":"tartus","name_ar":"طرطوس","reference_ar":"مدينة طرطوس","latitude":34.8959,"longitude":35.8867,"elevation_m":20},
+    {"id":"idlib","name_ar":"إدلب","reference_ar":"مدينة إدلب","latitude":35.9306,"longitude":36.6339,"elevation_m":460},
+    {"id":"deir_ezzor","name_ar":"دير الزور","reference_ar":"مدينة دير الزور","latitude":35.3359,"longitude":40.1408,"elevation_m":210},
+    {"id":"raqqa","name_ar":"الرقة","reference_ar":"مدينة الرقة","latitude":35.9594,"longitude":39.0090,"elevation_m":245},
+    {"id":"hasakah","name_ar":"الحسكة","reference_ar":"مدينة الحسكة","latitude":36.5024,"longitude":40.7477,"elevation_m":300},
+    {"id":"daraa","name_ar":"درعا","reference_ar":"مدينة درعا","latitude":32.6189,"longitude":36.1021,"elevation_m":530},
+    {"id":"quneitra","name_ar":"القنيطرة","reference_ar":"نقطة مرجعية للمحافظة","latitude":33.1259,"longitude":35.8246,"elevation_m":950},
+    {"id":"as_suwayda","name_ar":"السويداء","reference_ar":"مدينة السويداء","latitude":32.7089,"longitude":36.5661,"elevation_m":1070}
+  ]
+}

@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="لوحة تشغيلية لحساب ET0 وKc وETc للقمح في دمشق من بيانات الطقس الحديثة." />
+  <title>منصة الري وجدولة الري — دمشق</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="الصفحة الرئيسية">
+        <span class="brand-mark" aria-hidden="true">م</span>
+        <span>
+          <strong>منصة الري وجدولة الري</strong>
+          <small>للمحاصيل والأشجار المثمرة</small>
+        </span>
+      </a>
+      <div class="topbar-meta">
+        <span class="live-dot"></span>
+        <span>نسخة تشغيلية قابلة للمراجعة</span>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="page-title">
+        <div class="hero-copy">
+          <p class="eyebrow">CWR · DIN local crop model</p>
+          <h1 id="page-title">الطقس إلى قرار زراعي أوضح</h1>
+          <p class="hero-text">نربط الطقس الحديث بمحرك FAO-56 وبمعاملات المحصول المحلية السورية، مع فصل القياس الفعلي عن المصدر البديل والتوقع.</p>
+        </div>
+        <div class="hero-stamp">
+          <span>المعادلة التشغيلية</span>
+          <b>ETc = ET0 × Kc</b>
+          <small>دون حساسات في هذه المرحلة</small>
+        </div>
+      </section>
+
+      <section class="control-panel panel" aria-labelledby="controls-title">
+        <div class="section-heading compact">
+          <div>
+            <p class="eyebrow">الإعدادات الحالية</p>
+            <h2 id="controls-title">حدد الحقل والموسم</h2>
+          </div>
+          <span id="data-status" class="status-pill neutral">جاهز للتحميل</span>
+        </div>
+        <form id="controls-form" class="controls-grid">
+          <label>
+            <span>المحافظة / المنطقة المرجعية</span>
+            <select id="location-name" aria-label="اختيار المحافظة أو المنطقة المرجعية"></select>
+            <small id="location-reference" class="field-hint">تُملأ الإحداثيات والارتفاع تلقائيًا</small>
+          </label>
+          <label>
+            <span>خط العرض</span>
+            <input id="latitude" type="number" value="33.5138" step="0.0001" min="-90" max="90" />
+          </label>
+          <label>
+            <span>خط الطول</span>
+            <input id="longitude" type="number" value="36.2765" step="0.0001" min="-180" max="180" />
+          </label>
+          <label>
+            <span>الارتفاع المعتمد (م)</span>
+            <input id="elevation" type="number" value="1072.05" step="0.01" min="0" max="9000" />
+          </label>
+          <label>
+            <span>المحصول</span>
+            <select id="crop-select" aria-label="اختيار المحصول"></select>
+          </label>
+          <label>
+            <span>بداية الموسم</span>
+            <input id="season-start" type="date" value="2026-11-15" />
+          </label>
+          <div class="control-action">
+            <button class="primary-button" type="submit"><span aria-hidden="true">↻</span> تحديث البيانات</button>
+            <small>آخر 7 أيام + الأيام السبعة التالية</small>
+          </div>
+        </form>
+      </section>
+
+      <section class="location-strip" aria-label="ملخص الحقل">
+        <div>
+          <span class="strip-label">الموقع</span>
+          <strong id="location-summary">دمشق</strong>
+        </div>
+        <div>
+          <span class="strip-label">المحصول</span>
+          <strong id="crop-summary">القمح</strong>
+        </div>
+        <div>
+          <span class="strip-label">المرحلة الحالية</span>
+          <strong id="stage-summary">—</strong>
+        </div>
+        <div>
+          <span class="strip-label">المصدر النشط</span>
+          <strong id="source-summary">—</strong>
+        </div>
+        <div class="strip-update">
+          <span class="strip-label">تحديث الواجهة</span>
+          <strong id="updated-at">—</strong>
+        </div>
+      </section>
+
+      <section class="metric-grid" aria-label="المؤشرات الأساسية">
+        <article class="metric-card et0-card">
+          <div class="metric-top"><span>ET0 المرجعي</span><span class="metric-icon">01</span></div>
+          <strong id="metric-et0">—</strong>
+          <small>مجموع الفترة · ملم</small>
+        </article>
+        <article class="metric-card kc-card">
+          <div class="metric-top"><span>Kc المحصول</span><span class="metric-icon">02</span></div>
+          <strong id="metric-kc">—</strong>
+          <small>متوسط الفترة · بلا وحدة</small>
+        </article>
+        <article class="metric-card etc-card">
+          <div class="metric-top"><span>ETc للمحصول</span><span class="metric-icon">03</span></div>
+          <strong id="metric-etc">—</strong>
+          <small>الماء المناخي النظري · ملم</small>
+        </article>
+        <article class="metric-card rain-card">
+          <div class="metric-top"><span>المطر المتوقع</span><span class="metric-icon">04</span></div>
+          <strong id="metric-rain">—</strong>
+          <small>مجموع الفترة · ملم</small>
+        </article>
+      </section>
+
+      <section class="content-grid">
+        <article class="panel chart-panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">قراءة سريعة</p>
+              <h2>ET0 وETc عبر الفترة</h2>
+            </div>
+            <div class="legend" aria-label="مفتاح الرسم">
+              <span><i class="legend-line et0-line"></i> ET0</span>
+              <span><i class="legend-line etc-line"></i> ETc</span>
+            </div>
+          </div>
+          <div id="chart-wrap" class="chart-wrap" aria-label="رسم خطي للبخرنتح المرجعي والمحصولي">
+            <div class="empty-state">سيظهر الرسم بعد تحميل بيانات الطقس.</div>
+          </div>
+          <div class="chart-footnote"><span class="tiny-dot"></span> القيم المستقبلية تبقى توقعات وليست قياسات فعلية.</div>
+        </article>
+
+        <aside class="panel method-panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">قابلية التتبع</p>
+              <h2>كيف حُسبت الأرقام؟</h2>
+            </div>
+          </div>
+          <div class="method-step"><span>01</span><p><b>الطقس</b><br />NASA POWER للبيانات المكتملة، وOpen-Meteo لتعويض النقص وللتوقعات.</p></div>
+          <div class="method-step"><span>02</span><p><b>ET0</b><br />FAO-56 Penman–Monteith، مع تحويل الرياح من 10م إلى 2م عند استخدام Open-Meteo.</p></div>
+          <div class="method-step"><span>03</span><p><b>Kc</b><br />المعامل السوري المحلي ينتقل تدريجيًا حسب أطوار L1–L4.</p></div>
+          <div class="method-step"><span>04</span><p><b>ETc</b><br />احتياج المحصول المناخي النظري = ET0 × Kc.</p></div>
+        </aside>
+      </section>
+
+      <section class="panel table-panel" aria-labelledby="table-title">
+        <div class="section-heading table-heading">
+          <div>
+            <p class="eyebrow">السجل اليومي</p>
+            <h2 id="table-title">الطقس والحسابات</h2>
+          </div>
+          <div class="table-note"><span class="badge actual-badge">فعلي</span><span class="badge alternative-badge">بديل</span><span class="badge forecast-badge">توقع</span></div>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>التاريخ</th>
+                <th>الحالة / المصدر</th>
+                <th>الحرارة °م</th>
+                <th>الإشعاع<br /><small>MJ/m²/day</small></th>
+                <th>الرياح<br /><small>م/ث عند 2م</small></th>
+                <th>المطر<br /><small>ملم</small></th>
+                <th>ET0<br /><small>ملم</small></th>
+                <th>Kc</th>
+                <th>الطور</th>
+                <th>ETc<br /><small>ملم</small></th>
+              </tr>
+            </thead>
+            <tbody id="results-body">
+              <tr><td colspan="10" class="table-empty">اضغط «تحديث البيانات» لبدء التحميل.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="data-message" class="data-message neutral-message">المصدر والحالة يظهران لكل سجل حتى لا تختلط التوقعات بالقياسات الفعلية.</div>
+      </section>
+
+      <section class="notice-grid">
+        <article class="notice notice-accent">
+          <span class="notice-kicker">تصحيح NASA POWER</span>
+          <h3>لا نضرب الإشعاع في 3.6 تلقائيًا</h3>
+          <p>عند استخدام <code>community=AG</code>، تُقرأ <code>ALLSKY_SFC_SW_DWN</code> بوحدة <b>MJ/m²/day</b>. لذلك يبقى الرقم كما هو. التحويل يطبق فقط عند ثبوت أن المصدر أعاد kWh.</p>
+        </article>
+        <article class="notice">
+          <span class="notice-kicker">حدود النسخة الأولى</span>
+          <h3>ETc ليس كمية الري النهائية بعد</h3>
+          <p>المخرجات هنا تمثل الاستهلاك المناخي النظري للمحصول. تحويلها إلى توصية ري يتطلب لاحقًا المطر الفعال، رطوبة التربة، كفاءة الري، ونوع التربة.</p>
+        </article>
+      </section>
+    </main>
+
+    <footer class="footer"><span>نسخة تحقق v0.1 · تمهيد لتطبيق Kotlin APK</span><span>منصة الري وجدولة الري للمحاصيل والأشجار المثمرة · الحساب: FAO-56</span></footer>
+  </div>
+  <script src="/app.js" defer></script>
+</body>
+</html>
