@@ -85,7 +85,7 @@ function readNasaPayload(payload) {
   }, {});
 }
 
-function readOpenMeteoPayload(payload) {
+function readOpenMeteoPayload(payload, sourceLabel = 'Open-Meteo') {
   const daily = payload?.daily || {};
   return (daily.time || []).reduce((result, date, index) => {
     result[date] = {
@@ -99,7 +99,7 @@ function readOpenMeteoPayload(payload) {
       wind2: null,
       pressure: numberOrNull(daily.surface_pressure_mean?.[index]),
       rain: numberOrNull(daily.precipitation_sum?.[index]) ?? 0,
-      source: 'Open-Meteo',
+      source: sourceLabel,
       solarUnit: 'MJ/m²/day'
     };
     return result;
@@ -124,7 +124,7 @@ function chooseWeather(date, today, nasaByDate, openMeteoByDate) {
     return { ...nasa, solar: open.solar, rain: nasa.rain ?? open.rain, state: 'alternative', stateLabel: 'بديل للإشعاع', sourceLabel: 'NASA + Open-Meteo', quality: 'solar-fallback' };
   }
   if (openCore) {
-    return { ...open, state: future ? 'forecast' : 'alternative', stateLabel: future ? 'توقع' : 'بيانات بديلة', sourceLabel: 'Open-Meteo', quality: future ? 'forecast' : 'alternative' };
+    return { ...open, state: future ? 'forecast' : 'alternative', stateLabel: future ? 'توقع' : 'بيانات بديلة', sourceLabel: open.source || 'Open-Meteo', quality: future ? 'forecast' : 'alternative' };
   }
   if (nasaCore) {
     return { ...nasa, state: 'actual', stateLabel: 'فعلي ناقص', sourceLabel: 'NASA POWER', quality: 'incomplete' };
@@ -202,26 +202,31 @@ function kcForDay(crop, dayFromStart) {
 }
 
 async function loadWeather() {
-  const today = damascusToday();
-  const start = addDays(today, -7);
-  const end = addDays(today, 6);
+  const actualToday = damascusToday();
+  const referenceDate = $('weather-date').value || actualToday;
+  const start = addDays(referenceDate, -7);
+  const end = addDays(referenceDate, 6);
   const latitude = Number($('latitude').value);
   const longitude = Number($('longitude').value);
   const elevation = Number($('elevation').value);
-  const nasaEnd = addDays(today, -1);
+  const nasaEnd = end < actualToday ? end : addDays(actualToday, -1);
   const nasaUrl = `https://power.larc.nasa.gov/api/temporal/daily/point?parameters=T2M_MAX,T2M_MIN,T2MDEW,RH2M,ALLSKY_SFC_SW_DWN,WS2M,PS,PRECTOTCORR&community=AG&longitude=${longitude}&latitude=${latitude}&start=${apiDate(start)}&end=${apiDate(nasaEnd)}&format=JSON&time-standard=LST`;
-  const openMeteoUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&elevation=${elevation}&timezone=${encodeURIComponent(TIMEZONE)}&wind_speed_unit=ms&past_days=7&forecast_days=7&daily=temperature_2m_max,temperature_2m_min,dew_point_2m_mean,wind_speed_10m_mean,shortwave_radiation_sum,precipitation_sum,surface_pressure_mean`;
-  const results = await Promise.allSettled([fetchJson(nasaUrl), fetchJson(openMeteoUrl)]);
+  const historical = referenceDate < actualToday;
+  const openBase = historical ? 'https://archive-api.open-meteo.com/v1/archive' : 'https://api.open-meteo.com/v1/forecast';
+  const openPeriod = historical ? `start_date=${start}&end_date=${end}` : 'past_days=7&forecast_days=7';
+  const openMeteoUrl = `${openBase}?latitude=${latitude}&longitude=${longitude}&elevation=${elevation}&timezone=${encodeURIComponent(TIMEZONE)}&wind_speed_unit=ms&${openPeriod}&daily=temperature_2m_max,temperature_2m_min,dew_point_2m_mean,wind_speed_10m_mean,shortwave_radiation_sum,precipitation_sum,surface_pressure_mean`;
+  const nasaRequest = nasaEnd >= start ? fetchJson(nasaUrl) : Promise.resolve(null);
+  const results = await Promise.allSettled([nasaRequest, fetchJson(openMeteoUrl)]);
   const nasaPayload = results[0].status === 'fulfilled' ? results[0].value : null;
   const openPayload = results[1].status === 'fulfilled' ? results[1].value : null;
   if (!nasaPayload && !openPayload) throw new Error('تعذر الاتصال بمصدري الطقس.');
   const nasaByDate = nasaPayload ? readNasaPayload(nasaPayload) : {};
-  const openMeteoByDate = openPayload ? readOpenMeteoPayload(openPayload) : {};
+  const openMeteoByDate = openPayload ? readOpenMeteoPayload(openPayload, historical ? 'Open-Meteo Archive' : 'Open-Meteo') : {};
   const crop = state.catalog.records.find((item) => item.id === $('crop-select').value) || state.catalog.records[0];
   const seasonStart = $('season-start').value;
   const rows = [];
   for (let date = start; date <= end; date = addDays(date, 1)) {
-    const weather = chooseWeather(date, today, nasaByDate, openMeteoByDate);
+    const weather = chooseWeather(date, actualToday, nasaByDate, openMeteoByDate);
     const et0Result = calculateEt0(weather, date, latitude, elevation);
     const kcResult = kcForDay(crop, daysBetween(seasonStart, date));
     const etc = et0Result.et0 != null && kcResult.kc != null ? et0Result.et0 * kcResult.kc : null;
@@ -237,7 +242,7 @@ async function loadWeather() {
       reason: et0Result.reason
     });
   }
-  return { rows, today, start, end, sourceAvailability: { nasa: Boolean(nasaPayload), openMeteo: Boolean(openPayload) } };
+  return { rows, today: referenceDate, referenceDate, start, end, sourceAvailability: { nasa: Boolean(nasaPayload), openMeteo: Boolean(openPayload) } };
 }
 
 function stageLabel(stage) {
@@ -378,6 +383,7 @@ function populateLocations(locationCatalog) {
 
 async function init() {
   try {
+    $('weather-date').value = damascusToday();
     const [catalog, locations] = await Promise.all([fetchJson(CROP_DATA_URL), fetchJson(LOCATION_DATA_URL)]);
     state.catalog = catalog;
     state.locations = locations;

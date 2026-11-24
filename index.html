@@ -71,9 +71,14 @@
             <span>بداية الموسم</span>
             <input id="season-start" type="date" value="2026-11-15" />
           </label>
+          <label>
+            <span>تاريخ الطقس المرجعي</span>
+            <input id="weather-date" type="date" value="" />
+            <small class="field-hint">يحدد سنة وفترة بيانات الطقس</small>
+          </label>
           <div class="control-action">
             <button class="primary-button" type="submit"><span aria-hidden="true">↻</span> تحديث البيانات</button>
-            <small>آخر 7 أيام + الأيام السبعة التالية</small>
+            <small>7 أيام قبل التاريخ المرجعي + 7 أيام بعده</small>
           </div>
         </form>
       </section>
