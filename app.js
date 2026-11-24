@@ -1,7 +1,8 @@
 const TIMEZONE = 'Asia/Damascus';
 const CROP_DATA_URL = '/data/crops_local_syria_v0.1.json';
 const LOCATION_DATA_URL = '/data/locations_syria_v0.1.json';
-const state = { catalog: null, locations: null, rows: [], loading: false };
+const DIN_STORAGE_KEY = 'cwr-din-profile-v0.1';
+const state = { catalog: null, locations: null, rows: [], loading: false, din: null };
 
 const $ = (id) => document.getElementById(id);
 const numberOrNull = (value) => {
@@ -201,6 +202,168 @@ function kcForDay(crop, dayFromStart) {
   return { kc: end, stage: 'post_season' };
 }
 
+function defaultDinProfile() {
+  return {
+    version: '0.1.0',
+    field: { name: '', area: null, areaUnit: 'dunum', code: '' },
+    soil: { texture: '', rootDepthCm: null, ph: null, ec: null, organicMatter: null, n: null, p: null, k: null },
+    irrigation: { method: '', dischargeLph: null, units: null, spacingM: null, coverageM: null, intensityMmHour: null, intervalDays: null },
+    savedAt: null
+  };
+}
+
+function normaliseDinProfile(raw) {
+  const fallback = defaultDinProfile();
+  if (!raw || typeof raw !== 'object') return fallback;
+  return {
+    ...fallback,
+    ...raw,
+    field: { ...fallback.field, ...(raw.field || {}) },
+    soil: { ...fallback.soil, ...(raw.soil || {}) },
+    irrigation: { ...fallback.irrigation, ...(raw.irrigation || {}) }
+  };
+}
+
+function readDinProfile() {
+  try {
+    return normaliseDinProfile(JSON.parse(sessionStorage.getItem(DIN_STORAGE_KEY) || 'null'));
+  } catch (error) {
+    return defaultDinProfile();
+  }
+}
+
+function writeDinProfile(profile) {
+  try {
+    sessionStorage.setItem(DIN_STORAGE_KEY, JSON.stringify(profile));
+  } catch (error) {
+    console.warn('تعذر حفظ ملف DIN في جلسة المتصفح.', error);
+  }
+}
+
+function optionalNumber(id) {
+  const raw = $(id).value.trim();
+  if (!raw) return null;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : null;
+}
+
+function readDinForm() {
+  return normaliseDinProfile({
+    version: '0.1.0',
+    field: {
+      name: $('field-name').value.trim(),
+      area: optionalNumber('field-area'),
+      areaUnit: $('field-area-unit').value,
+      code: $('field-code').value.trim()
+    },
+    soil: {
+      texture: $('soil-texture').value,
+      rootDepthCm: optionalNumber('soil-root-depth'),
+      ph: optionalNumber('soil-ph'),
+      ec: optionalNumber('soil-ec'),
+      organicMatter: optionalNumber('soil-organic-matter'),
+      n: optionalNumber('soil-n'),
+      p: optionalNumber('soil-p'),
+      k: optionalNumber('soil-k')
+    },
+    irrigation: {
+      method: $('irrigation-method').value,
+      dischargeLph: optionalNumber('irrigation-discharge'),
+      units: optionalNumber('irrigation-units'),
+      spacingM: optionalNumber('irrigation-spacing'),
+      coverageM: optionalNumber('irrigation-coverage'),
+      intensityMmHour: optionalNumber('irrigation-intensity'),
+      intervalDays: optionalNumber('irrigation-interval')
+    }
+  });
+}
+
+function assignInput(id, value) {
+  $(id).value = value == null ? '' : value;
+}
+
+function populateDinForm(profile) {
+  const data = normaliseDinProfile(profile);
+  assignInput('field-name', data.field.name);
+  assignInput('field-area', data.field.area);
+  assignInput('field-area-unit', data.field.areaUnit);
+  assignInput('field-code', data.field.code);
+  assignInput('soil-texture', data.soil.texture);
+  assignInput('soil-root-depth', data.soil.rootDepthCm);
+  assignInput('soil-ph', data.soil.ph);
+  assignInput('soil-ec', data.soil.ec);
+  assignInput('soil-organic-matter', data.soil.organicMatter);
+  assignInput('soil-n', data.soil.n);
+  assignInput('soil-p', data.soil.p);
+  assignInput('soil-k', data.soil.k);
+  assignInput('irrigation-method', data.irrigation.method);
+  assignInput('irrigation-discharge', data.irrigation.dischargeLph);
+  assignInput('irrigation-units', data.irrigation.units);
+  assignInput('irrigation-spacing', data.irrigation.spacingM);
+  assignInput('irrigation-coverage', data.irrigation.coverageM);
+  assignInput('irrigation-intensity', data.irrigation.intensityMmHour);
+  assignInput('irrigation-interval', data.irrigation.intervalDays);
+}
+
+const dinAreaLabels = { dunum: 'دونم', hectare: 'هكتار', m2: 'م²' };
+const dinTextureLabels = { sandy: 'رملية', loamy: 'طميية', clay_loam: 'طينية مزيجة', clayey: 'طينية' };
+const dinIrrigationLabels = { surface: 'سطحي / أخاديد', sprinkler: 'رذاذ / مرش', drip_gr: 'تنقيط GR', external_emitters: 'نقاطات خارجية', other: 'أخرى' };
+
+function updateRootDepthHint() {
+  const crop = state.catalog?.records.find((item) => item.id === $('crop-select').value);
+  if (!crop) return;
+  const range = crop.root_depth_cm_min === crop.root_depth_cm_max
+    ? `${crop.root_depth_cm_min} سم`
+    : `${crop.root_depth_cm_min}–${crop.root_depth_cm_max} سم`;
+  $('root-depth-hint').textContent = `المرجع المحلي لـ${crop.name_ar}: ${range} · يمكن تعديله من تحليل الحقل`;
+}
+
+function renderDinSummary(profile) {
+  const data = normaliseDinProfile(profile);
+  const area = data.field.area != null ? `${formatNumber(data.field.area, 2)} ${dinAreaLabels[data.field.areaUnit] || ''}` : '—';
+  const soilParts = [];
+  if (data.soil.texture) soilParts.push(dinTextureLabels[data.soil.texture] || data.soil.texture);
+  if (data.soil.rootDepthCm != null) soilParts.push(`${formatNumber(data.soil.rootDepthCm, 0)} سم جذور`);
+  if (data.soil.ph != null) soilParts.push(`pH ${formatNumber(data.soil.ph, 2)}`);
+  const irrigation = dinIrrigationLabels[data.irrigation.method] || 'غير محددة';
+  $('din-summary-field').textContent = data.field.name || '—';
+  $('din-summary-area').textContent = area;
+  $('din-summary-soil').textContent = soilParts.length ? soilParts.join(' · ') : 'لم يُدخل بعد';
+  $('din-summary-irrigation').textContent = irrigation;
+  $('din-summary-interval').textContent = data.irrigation.intervalDays != null ? `${formatNumber(data.irrigation.intervalDays, 0)} يوم` : '—';
+  const message = $('din-message');
+  if (data.savedAt) {
+    const saved = new Intl.DateTimeFormat('ar-SY', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }).format(new Date(data.savedAt));
+    message.className = 'data-message neutral-message';
+    message.textContent = `تم حفظ ملف DIN في جلسة المتصفح عند ${saved}. المدخلات توثيقية حاليًا ولا تغيّر ET0 أو Kc أو ETc.`;
+  } else {
+    message.className = 'data-message neutral-message';
+    message.textContent = 'لم يُحفظ ملف DIN بعد.';
+  }
+}
+
+function saveDinProfile(event) {
+  event.preventDefault();
+  const profile = readDinForm();
+  if (!profile.field.name || profile.field.area == null || profile.field.area <= 0) {
+    $('din-message').className = 'data-message error-message';
+    $('din-message').textContent = 'أدخل اسم الحقل ومساحة أكبر من صفر قبل الحفظ.';
+    return;
+  }
+  profile.savedAt = new Date().toISOString();
+  state.din = profile;
+  writeDinProfile(profile);
+  renderDinSummary(profile);
+}
+
+function clearDinProfile() {
+  const profile = defaultDinProfile();
+  state.din = profile;
+  try { sessionStorage.removeItem(DIN_STORAGE_KEY); } catch (error) { console.warn('تعذر مسح ملف DIN.', error); }
+  populateDinForm(profile);
+  renderDinSummary(profile);
+}
+
 async function loadWeather() {
   const actualToday = damascusToday();
   const referenceDate = $('weather-date').value || actualToday;
@@ -389,8 +552,17 @@ async function init() {
     state.locations = locations;
     populateCrops(state.catalog);
     populateLocations(state.locations);
+    state.din = readDinProfile();
+    populateDinForm(state.din);
+    updateRootDepthHint();
+    renderDinSummary(state.din);
     $('controls-form').addEventListener('submit', (event) => { event.preventDefault(); refresh(); });
-    $('crop-select').addEventListener('change', () => { $('crop-summary').textContent = state.catalog.records.find((crop) => crop.id === $('crop-select').value)?.name_ar || '—'; });
+    $('din-form').addEventListener('submit', saveDinProfile);
+    $('din-clear').addEventListener('click', clearDinProfile);
+    $('crop-select').addEventListener('change', () => {
+      $('crop-summary').textContent = state.catalog.records.find((crop) => crop.id === $('crop-select').value)?.name_ar || '—';
+      updateRootDepthHint();
+    });
     $('location-name').addEventListener('change', () => applyLocation(selectedLocation()));
     await refresh();
   } catch (error) {

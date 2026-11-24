@@ -83,6 +83,112 @@
         </form>
       </section>
 
+      <section class="panel din-panel" aria-labelledby="din-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">DIN · المرحلة الأولى</p>
+            <h2 id="din-title">ملف الحقل والتربة وطريقة الري</h2>
+            <p class="section-lead">نسجل مدخلات الحقل كما يحتاجها DIN، من دون إدخالها في حساب ET0 أو Kc أو إنتاج توصية ري نهائية في هذه المرحلة.</p>
+          </div>
+          <span class="status-pill neutral">مدخلات قابلة للمراجعة</span>
+        </div>
+
+        <form id="din-form" class="din-form">
+          <div class="din-grid">
+            <article class="din-card">
+              <div class="din-card-heading"><span class="din-index">01</span><div><h3>تعريف الحقل</h3><p>هوية المساحة التي سيرتبط بها سجل المحصول والطقس.</p></div></div>
+              <div class="din-fields two-columns">
+                <label>
+                  <span>اسم الحقل</span>
+                  <input id="field-name" type="text" placeholder="مثال: حقل القمح الغربي" required />
+                </label>
+                <label>
+                  <span>المساحة</span>
+                  <input id="field-area" type="number" min="0" step="0.01" placeholder="مثال: 12" required />
+                </label>
+                <label>
+                  <span>وحدة المساحة</span>
+                  <select id="field-area-unit">
+                    <option value="dunum">دونم</option>
+                    <option value="hectare">هكتار</option>
+                    <option value="m2">متر مربع</option>
+                  </select>
+                </label>
+                <label>
+                  <span>رقم/رمز الحقل <small class="optional-label">اختياري</small></span>
+                  <input id="field-code" type="text" placeholder="مثال: D-01" />
+                </label>
+              </div>
+            </article>
+
+            <article class="din-card">
+              <div class="din-card-heading"><span class="din-index">02</span><div><h3>تحليل التربة</h3><p>حقول DIN الأساسية؛ لا تغيّر الحساب المناخي في النسخة الحالية.</p></div></div>
+              <div class="din-fields four-columns">
+                <label>
+                  <span>قوام التربة</span>
+                  <select id="soil-texture">
+                    <option value="">غير محدد</option>
+                    <option value="sandy">رملية</option>
+                    <option value="loamy">طميية</option>
+                    <option value="clay_loam">طينية مزيجة</option>
+                    <option value="clayey">طينية</option>
+                  </select>
+                </label>
+                <label>
+                  <span>عمق الجذور الفعال (سم)</span>
+                  <input id="soil-root-depth" type="number" min="0" max="300" step="1" placeholder="أدخل القيمة" />
+                  <small id="root-depth-hint" class="field-hint">المرجع المحلي للمحصول سيظهر هنا</small>
+                </label>
+                <label><span>pH</span><input id="soil-ph" type="number" min="0" max="14" step="0.01" placeholder="—" /></label>
+                <label><span>EC (dS/m)</span><input id="soil-ec" type="number" min="0" step="0.01" placeholder="—" /></label>
+                <label><span>المادة العضوية (%)</span><input id="soil-organic-matter" type="number" min="0" step="0.01" placeholder="—" /></label>
+                <label><span>N (mg/kg)</span><input id="soil-n" type="number" min="0" step="0.01" placeholder="—" /></label>
+                <label><span>P (mg/kg)</span><input id="soil-p" type="number" min="0" step="0.01" placeholder="—" /></label>
+                <label><span>K (mg/kg)</span><input id="soil-k" type="number" min="0" step="0.01" placeholder="—" /></label>
+              </div>
+            </article>
+
+            <article class="din-card din-card-wide">
+              <div class="din-card-heading"><span class="din-index">03</span><div><h3>طريقة الري والهيدروليك</h3><p>توثيق مدخلات DIN فقط؛ لن تستخدم في حساب ساعات التشغيل قبل اعتماد سياسة الكفاءة والمطر الفعال.</p></div></div>
+              <div class="din-fields four-columns">
+                <label>
+                  <span>طريقة الري</span>
+                  <select id="irrigation-method">
+                    <option value="">غير محددة</option>
+                    <option value="surface">ري سطحي / أخاديد</option>
+                    <option value="sprinkler">رذاذ / مرش</option>
+                    <option value="drip_gr">تنقيط GR</option>
+                    <option value="external_emitters">نقاطات خارجية</option>
+                    <option value="other">طريقة أخرى</option>
+                  </select>
+                </label>
+                <label><span>التصريف (لتر/ساعة)</span><input id="irrigation-discharge" type="number" min="0" step="0.01" placeholder="للنقاطات/المرشات" /></label>
+                <label><span>عدد النقاطات/المرشات</span><input id="irrigation-units" type="number" min="0" step="1" placeholder="—" /></label>
+                <label><span>المسافة بين الوحدات (م)</span><input id="irrigation-spacing" type="number" min="0" step="0.01" placeholder="—" /></label>
+                <label><span>عرض التغطية أو المسافة بين الخطوط (م)</span><input id="irrigation-coverage" type="number" min="0" step="0.01" placeholder="—" /></label>
+                <label><span>كثافة التطبيق (ملم/ساعة)</span><input id="irrigation-intensity" type="number" min="0" step="0.01" placeholder="يدخل مباشرة عند توفره" /></label>
+                <label><span>الفاصل بين الريات (يوم)</span><input id="irrigation-interval" type="number" min="0" step="1" placeholder="—" /></label>
+              </div>
+            </article>
+          </div>
+
+          <div class="din-actions">
+            <button class="primary-button" type="submit">حفظ ملف DIN في الجلسة</button>
+            <button id="din-clear" class="secondary-button" type="button">مسح المدخلات</button>
+            <small>الحفظ محلي في جلسة المتصفح، ولا يرسل تحليل التربة إلى أي خادم.</small>
+          </div>
+          <div id="din-message" class="data-message neutral-message">لم يُحفظ ملف DIN بعد.</div>
+        </form>
+
+        <div class="din-summary" aria-live="polite">
+          <div><span>الحقل</span><strong id="din-summary-field">—</strong></div>
+          <div><span>المساحة</span><strong id="din-summary-area">—</strong></div>
+          <div><span>التربة</span><strong id="din-summary-soil">—</strong></div>
+          <div><span>الري</span><strong id="din-summary-irrigation">—</strong></div>
+          <div><span>الفاصل</span><strong id="din-summary-interval">—</strong></div>
+        </div>
+      </section>
+
       <section class="location-strip" aria-label="ملخص الحقل">
         <div>
           <span class="strip-label">الموقع</span>
