@@ -70,8 +70,8 @@ input:focus, select:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgb
 .din-panel { margin-top: 16px; padding: 24px 26px 22px; }
 .section-lead { max-width: 760px; margin: 6px 0 0; color: var(--ink-soft); font-size: 12px; }
 .din-form { display: block; }
-.din-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-.din-card { padding: 18px; border: 1px solid var(--line); border-radius: 17px; background: #fbfcf9; }
+.din-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: start; }
+.din-card { align-self: start; padding: 18px; border: 1px solid var(--line); border-radius: 17px; background: #fbfcf9; }
 .din-card-wide { grid-column: 1 / -1; }
 .din-card-heading { display: flex; align-items: flex-start; gap: 11px; margin-bottom: 16px; }
 .din-index { display: grid; place-items: center; flex: 0 0 30px; width: 30px; height: 30px; border-radius: 9px; background: var(--teal); color: #fff; font: 600 10px 'Space Grotesk', sans-serif; }
