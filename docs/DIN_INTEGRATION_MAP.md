@@ -70,14 +70,18 @@ ETc = ET0 × Kc
 ### المرحلة الثانية: تحويل ETc إلى توصية ري
 
 ```text
-ETc_adjusted = ETc × Kr × coverage_coefficient
-net_irrigation_need = ETc_adjusted − effective_rainfall
- gross_irrigation_need = net_irrigation_need / application_efficiency
- irrigation_amount = gross_irrigation_need × irrigation_interval_days
- irrigation_hours = irrigation_amount / application_intensity_mm_hour
+weekly_ETc = Σ(ETc لآخر 7 أيام حتى تاريخ الطقس المرجعي)
+ETc_adjusted = weekly_ETc × Kr × coverage_coefficient
+effective_rainfall = min(weekly_rain, ETc_adjusted)
+net_irrigation_need = max(0, ETc_adjusted − effective_rainfall)
+gross_irrigation_need = net_irrigation_need / application_efficiency
+water_volume_m3 = gross_irrigation_need × area_ha × 10
+irrigation_hours = gross_irrigation_need / application_intensity_mm_hour
 ```
 
-يجب أن تكون القيم السالبة بعد طرح المطر صفرًا، مع حفظ المطر الفعال والمطر الكلي منفصلين. ولا يجوز إطلاق المرحلة الثانية قبل اعتماد طريقة المطر الفعال، وقيمة `Kr`، وقيمة معامل الكفاءة لكل طريقة ري.
+في النسخة HTML الحالية نفذت هذه الصيغة كـ«ميزان أسبوعي أولي». قيمة `Kr=1` مؤقتة لتجنب تكرار أثر التغطية مع `Kc` و`C`، والمطر الفعال المؤقت هو الأصغر بين المطر اليدوي والطلب المغطى. القيم السالبة بعد طرح المطر تصبح صفرًا، مع إبقاء المطر الكلي المدخل منفصلًا عن المطر الفعال المحسوب.
+
+هذه النتيجة لا تمثل بعد تخزين التربة أو الجريان السطحي أو حالة العجز الابتدائية، ولا تعد توصية تشغيلية نهائية قبل تثبيت سياسة المطر الفعال التفصيلية.
 
 ## السياسة المعتمدة للمدخلات الهيدروفيزيائية والري
 
@@ -132,7 +136,7 @@ RAW (mm) = TAW × MAD
 
 1. إضافة نموذج حقل وملف تربة وطريقة ري إلى الواجهة، من دون تغيير ET0/Kc الحالي.
 2. إدخال معامل التغطية `C`، وكفاءة الري القابلة للتعديل، و`FC/WP/MAD`، والمطر الأسبوعي اليدوي مع حدود الوحدات والتحقق منها.
-3. عرض `TAW` و`RAW` ثم حساب المطر الفعال وصافي وإجمالي كمية الري وساعات التشغيل، مع إبقاء النتيجة موسومة بأنها توصية نموذجية.
+3. عرض `TAW` و`RAW` ثم حساب ميزان أسبوعي أولي للمطر الفعال وصافي وإجمالي كمية الري وحجم المياه وساعات التشغيل، مع إبقاء النتيجة موسومة بأنها مؤقتة.
 4. إضافة شاشة تسجيل الري الفعلي ومقارنته بالخط الموصى به كما في ورقة DIN.
 5. إضافة وحدتي التسميد والاقتصاد بعد تثبيت جدولة الري.
 

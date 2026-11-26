@@ -2,7 +2,7 @@ const TIMEZONE = 'Asia/Damascus';
 const CROP_DATA_URL = '/data/crops_local_syria_v0.1.json';
 const LOCATION_DATA_URL = '/data/locations_syria_v0.1.json';
 const DIN_STORAGE_KEY = 'cwr-din-profile-v0.1';
-const state = { catalog: null, locations: null, rows: [], loading: false, din: null };
+const state = { catalog: null, locations: null, rows: [], referenceDate: null, loading: false, din: null };
 
 const $ = (id) => document.getElementById(id);
 const numberOrNull = (value) => {
@@ -321,6 +321,7 @@ const dinAreaLabels = { dunum: 'دونم', hectare: 'هكتار', m2: 'م²' };
 const dinTextureLabels = { sandy: 'رملية', loamy: 'طميية', clay_loam: 'طينية مزيجة', clayey: 'طينية' };
 const dinIrrigationLabels = { surface: 'سطحي / أخاديد', sprinkler: 'رذاذ / مرش', drip_gr: 'تنقيط GR', external_emitters: 'نقاطات خارجية', other: 'أخرى' };
 const dinEfficiencyDefaults = { surface: 0.65, sprinkler: 0.75, drip_gr: 0.85, external_emitters: 0.85, other: 0.75 };
+const DIN_KR_DEFAULT = 1;
 
 function defaultIrrigationEfficiency(method) {
   return dinEfficiencyDefaults[method] ?? null;
@@ -348,6 +349,31 @@ function calculateSoilWater(profile) {
   return { taw, raw: taw * mad };
 }
 
+function areaToHectares(area, unit) {
+  if (!Number.isFinite(area) || area <= 0) return null;
+  if (unit === 'hectare') return area;
+  if (unit === 'm2') return area / 10000;
+  return area * 0.1;
+}
+
+function calculateWeeklyDinBalance(profile, rows, referenceDate) {
+  const eligible = (rows || []).filter((row) => row.date <= (referenceDate || '9999-12-31') && row.etc != null).slice(-7);
+  const weeklyEtc = eligible.length ? eligible.reduce((sum, row) => sum + row.etc, 0) : null;
+  const asNumber = (value) => value == null || value === '' ? null : Number(value);
+  const coverage = asNumber(profile.irrigation.coverageCoefficient);
+  const weeklyRain = asNumber(profile.irrigation.weeklyRain);
+  const efficiency = asNumber(profile.irrigation.efficiency);
+  const intensity = asNumber(profile.irrigation.intensityMmHour);
+  const coveredDemand = weeklyEtc != null && Number.isFinite(coverage) ? weeklyEtc * DIN_KR_DEFAULT * coverage : null;
+  const effectiveRain = coveredDemand != null && Number.isFinite(weeklyRain) ? Math.min(Math.max(0, weeklyRain), coveredDemand) : null;
+  const netNeed = coveredDemand != null && effectiveRain != null ? Math.max(0, coveredDemand - effectiveRain) : null;
+  const grossNeed = netNeed != null && Number.isFinite(efficiency) && efficiency > 0 && efficiency <= 1 ? netNeed / efficiency : null;
+  const areaHa = areaToHectares(asNumber(profile.field.area), profile.field.areaUnit);
+  const volume = grossNeed != null && areaHa != null ? grossNeed * areaHa * 10 : null;
+  const hours = grossNeed != null && Number.isFinite(intensity) && intensity > 0 ? grossNeed / intensity : null;
+  return { weeklyEtc, effectiveRain, netNeed, grossNeed, volume, hours, eligibleDays: eligible.length, usedForecast: eligible.some((row) => row.state === 'forecast') };
+}
+
 function updateRootDepthHint() {
   const crop = state.catalog?.records.find((item) => item.id === $('crop-select').value);
   if (!crop) return;
@@ -357,7 +383,46 @@ function updateRootDepthHint() {
   $('root-depth-hint').textContent = `المرجع المحلي لـ${crop.name_ar}: ${range} · يمكن تعديله من تحليل الحقل`;
 }
 
-function renderDinSummary(profile) {
+function renderDinBalance(profile, rows = state.rows, referenceDate = state.referenceDate) {
+  const result = calculateWeeklyDinBalance(profile, rows, referenceDate);
+  $('din-weekly-etc').textContent = result.weeklyEtc != null ? `${formatNumber(result.weeklyEtc, 2)} ملم` : '—';
+  $('din-effective-rain').textContent = result.effectiveRain != null ? `${formatNumber(result.effectiveRain, 2)} ملم` : '—';
+  $('din-net-need').textContent = result.netNeed != null ? `${formatNumber(result.netNeed, 2)} ملم` : '—';
+  $('din-gross-need').textContent = result.grossNeed != null ? `${formatNumber(result.grossNeed, 2)} ملم` : '—';
+  $('din-water-volume').textContent = result.volume != null ? `${formatNumber(result.volume, 2)} م³` : '—';
+  $('din-irrigation-hours').textContent = result.hours != null ? `${formatNumber(result.hours, 2)} سا` : '—';
+  const status = $('din-balance-status');
+  if (result.weeklyEtc == null) {
+    status.className = 'status-pill neutral';
+    status.textContent = 'بانتظار ETc';
+  } else if (profile.irrigation.coverageCoefficient == null) {
+    status.className = 'status-pill neutral';
+    status.textContent = 'أدخل معامل C';
+  } else if (profile.irrigation.weeklyRain == null) {
+    status.className = 'status-pill neutral';
+    status.textContent = 'أدخل المطر الأسبوعي';
+  } else if (profile.irrigation.efficiency == null) {
+    status.className = 'status-pill neutral';
+    status.textContent = 'أدخل كفاءة الري';
+  } else if (result.netNeed == null) {
+    status.className = 'status-pill neutral';
+    status.textContent = 'راجع مدخلات الميزان';
+  } else if (result.volume == null) {
+    status.className = 'status-pill neutral';
+    status.textContent = 'أدخل مساحة الحقل';
+  } else if (result.hours == null) {
+    status.className = 'status-pill neutral';
+    status.textContent = 'أدخل كثافة التطبيق';
+  } else if (result.usedForecast) {
+    status.className = 'status-pill loading';
+    status.textContent = 'حساب يتضمن توقعًا';
+  } else {
+    status.className = 'status-pill success';
+    status.textContent = 'حساب أولي';
+  }
+}
+
+function renderDinSummary(profile, rows = state.rows, referenceDate = state.referenceDate) {
   const data = normaliseDinProfile(profile);
   const area = data.field.area != null ? `${formatNumber(data.field.area, 2)} ${dinAreaLabels[data.field.areaUnit] || ''}` : '—';
   const soilParts = [];
@@ -376,6 +441,7 @@ function renderDinSummary(profile) {
   $('din-taw').textContent = water.taw != null ? `${formatNumber(water.taw, 2)} ملم` : '—';
   $('din-raw').textContent = water.raw != null ? `${formatNumber(water.raw, 2)} ملم` : '—';
   $('din-rain-input').textContent = data.irrigation.weeklyRain != null ? `${formatNumber(data.irrigation.weeklyRain, 1)} ملم` : '—';
+  renderDinBalance(data, rows, referenceDate);
   const message = $('din-message');
   if (data.savedAt) {
     const saved = new Intl.DateTimeFormat('ar-SY', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }).format(new Date(data.savedAt));
@@ -423,7 +489,7 @@ function saveDinProfile(event) {
   profile.savedAt = new Date().toISOString();
   state.din = profile;
   writeDinProfile(profile);
-  renderDinSummary(profile);
+  renderDinSummary(profile, state.rows, state.referenceDate);
 }
 
 function clearDinProfile() {
@@ -432,7 +498,7 @@ function clearDinProfile() {
   try { sessionStorage.removeItem(DIN_STORAGE_KEY); } catch (error) { console.warn('تعذر مسح ملف DIN.', error); }
   populateDinForm(profile);
   updateEfficiencyHint();
-  renderDinSummary(profile);
+  renderDinSummary(profile, state.rows, state.referenceDate);
 }
 
 async function loadWeather() {
@@ -567,11 +633,13 @@ function renderDataMessage(rows, sourceAvailability) {
 
 function render(rows, metadata) {
   state.rows = rows;
+  state.referenceDate = metadata.referenceDate;
   const crop = state.catalog.records.find((item) => item.id === $('crop-select').value) || state.catalog.records[0];
   $('location-summary').textContent = selectedLocation()?.name_ar || 'الموقع المحدد';
   $('crop-summary').textContent = crop.name_ar;
   $('updated-at').textContent = new Intl.DateTimeFormat('ar-SY', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }).format(new Date());
   renderSummary(rows, metadata.today);
+  renderDinSummary(state.din, rows, metadata.referenceDate);
   renderChart(rows);
   renderTable(rows);
   renderDataMessage(rows, metadata.sourceAvailability);
