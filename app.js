@@ -206,8 +206,8 @@ function defaultDinProfile() {
   return {
     version: '0.1.0',
     field: { name: '', area: null, areaUnit: 'dunum', code: '' },
-    soil: { texture: '', rootDepthCm: null, ph: null, ec: null, organicMatter: null, n: null, p: null, k: null },
-    irrigation: { method: '', dischargeLph: null, units: null, spacingM: null, coverageM: null, intensityMmHour: null, intervalDays: null },
+    soil: { texture: '', rootDepthCm: null, fieldCapacity: null, wiltingPoint: null, mad: null, ph: null, ec: null, organicMatter: null, n: null, p: null, k: null },
+    irrigation: { method: '', coverageCoefficient: 1, efficiency: null, weeklyRain: null, dischargeLph: null, units: null, spacingM: null, coverageM: null, intensityMmHour: null, intervalDays: null },
     savedAt: null
   };
 }
@@ -259,6 +259,9 @@ function readDinForm() {
     soil: {
       texture: $('soil-texture').value,
       rootDepthCm: optionalNumber('soil-root-depth'),
+      fieldCapacity: optionalNumber('soil-field-capacity'),
+      wiltingPoint: optionalNumber('soil-wilting-point'),
+      mad: optionalNumber('soil-mad'),
       ph: optionalNumber('soil-ph'),
       ec: optionalNumber('soil-ec'),
       organicMatter: optionalNumber('soil-organic-matter'),
@@ -268,6 +271,9 @@ function readDinForm() {
     },
     irrigation: {
       method: $('irrigation-method').value,
+      coverageCoefficient: optionalNumber('coverage-coefficient'),
+      efficiency: optionalNumber('irrigation-efficiency'),
+      weeklyRain: optionalNumber('weekly-rain'),
       dischargeLph: optionalNumber('irrigation-discharge'),
       units: optionalNumber('irrigation-units'),
       spacingM: optionalNumber('irrigation-spacing'),
@@ -290,6 +296,9 @@ function populateDinForm(profile) {
   assignInput('field-code', data.field.code);
   assignInput('soil-texture', data.soil.texture);
   assignInput('soil-root-depth', data.soil.rootDepthCm);
+  assignInput('soil-field-capacity', data.soil.fieldCapacity);
+  assignInput('soil-wilting-point', data.soil.wiltingPoint);
+  assignInput('soil-mad', data.soil.mad);
   assignInput('soil-ph', data.soil.ph);
   assignInput('soil-ec', data.soil.ec);
   assignInput('soil-organic-matter', data.soil.organicMatter);
@@ -297,6 +306,9 @@ function populateDinForm(profile) {
   assignInput('soil-p', data.soil.p);
   assignInput('soil-k', data.soil.k);
   assignInput('irrigation-method', data.irrigation.method);
+  assignInput('coverage-coefficient', data.irrigation.coverageCoefficient == null ? 1 : data.irrigation.coverageCoefficient);
+  assignInput('irrigation-efficiency', data.irrigation.efficiency == null ? defaultIrrigationEfficiency(data.irrigation.method) : data.irrigation.efficiency);
+  assignInput('weekly-rain', data.irrigation.weeklyRain);
   assignInput('irrigation-discharge', data.irrigation.dischargeLph);
   assignInput('irrigation-units', data.irrigation.units);
   assignInput('irrigation-spacing', data.irrigation.spacingM);
@@ -308,6 +320,33 @@ function populateDinForm(profile) {
 const dinAreaLabels = { dunum: 'دونم', hectare: 'هكتار', m2: 'م²' };
 const dinTextureLabels = { sandy: 'رملية', loamy: 'طميية', clay_loam: 'طينية مزيجة', clayey: 'طينية' };
 const dinIrrigationLabels = { surface: 'سطحي / أخاديد', sprinkler: 'رذاذ / مرش', drip_gr: 'تنقيط GR', external_emitters: 'نقاطات خارجية', other: 'أخرى' };
+const dinEfficiencyDefaults = { surface: 0.65, sprinkler: 0.75, drip_gr: 0.85, external_emitters: 0.85, other: 0.75 };
+
+function defaultIrrigationEfficiency(method) {
+  return dinEfficiencyDefaults[method] ?? null;
+}
+
+function updateEfficiencyHint(applyDefault = false) {
+  const method = $('irrigation-method').value;
+  const defaultValue = defaultIrrigationEfficiency(method);
+  if (applyDefault && defaultValue != null) assignInput('irrigation-efficiency', defaultValue);
+  $('efficiency-hint').textContent = defaultValue == null
+    ? 'اختر طريقة الري لإظهار قيمة ابتدائية قابلة للتعديل'
+    : `الافتراضي المقترح لهذه الطريقة: ${formatNumber(defaultValue, 2)} · قابل للتعديل`;
+}
+
+function calculateSoilWater(profile) {
+  const soil = profile.soil;
+  const depth = Number(soil.rootDepthCm);
+  const fc = Number(soil.fieldCapacity);
+  const wp = Number(soil.wiltingPoint);
+  const mad = Number(soil.mad);
+  if (![depth, fc, wp, mad].every(Number.isFinite) || depth <= 0 || fc < wp || mad < 0 || mad > 1) {
+    return { taw: null, raw: null };
+  }
+  const taw = (fc - wp) * depth * 0.1;
+  return { taw, raw: taw * mad };
+}
 
 function updateRootDepthHint() {
   const crop = state.catalog?.records.find((item) => item.id === $('crop-select').value);
@@ -326,16 +365,22 @@ function renderDinSummary(profile) {
   if (data.soil.rootDepthCm != null) soilParts.push(`${formatNumber(data.soil.rootDepthCm, 0)} سم جذور`);
   if (data.soil.ph != null) soilParts.push(`pH ${formatNumber(data.soil.ph, 2)}`);
   const irrigation = dinIrrigationLabels[data.irrigation.method] || 'غير محددة';
+  const water = calculateSoilWater(data);
   $('din-summary-field').textContent = data.field.name || '—';
   $('din-summary-area').textContent = area;
   $('din-summary-soil').textContent = soilParts.length ? soilParts.join(' · ') : 'لم يُدخل بعد';
-  $('din-summary-irrigation').textContent = irrigation;
+  $('din-summary-irrigation').textContent = data.irrigation.method
+    ? `${irrigation} · C=${formatNumber(data.irrigation.coverageCoefficient, 2)}`
+    : 'غير محددة';
   $('din-summary-interval').textContent = data.irrigation.intervalDays != null ? `${formatNumber(data.irrigation.intervalDays, 0)} يوم` : '—';
+  $('din-taw').textContent = water.taw != null ? `${formatNumber(water.taw, 2)} ملم` : '—';
+  $('din-raw').textContent = water.raw != null ? `${formatNumber(water.raw, 2)} ملم` : '—';
+  $('din-rain-input').textContent = data.irrigation.weeklyRain != null ? `${formatNumber(data.irrigation.weeklyRain, 1)} ملم` : '—';
   const message = $('din-message');
   if (data.savedAt) {
     const saved = new Intl.DateTimeFormat('ar-SY', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }).format(new Date(data.savedAt));
     message.className = 'data-message neutral-message';
-    message.textContent = `تم حفظ ملف DIN في جلسة المتصفح عند ${saved}. المدخلات توثيقية حاليًا ولا تغيّر ET0 أو Kc أو ETc.`;
+    message.textContent = `تم حفظ ملف DIN في جلسة المتصفح عند ${saved}. المدخلات لا تغيّر ET0 أو Kc أو ETc؛ وTAW/RAW مؤشرات تقديرية عند اكتمال خصائص التربة.`;
   } else {
     message.className = 'data-message neutral-message';
     message.textContent = 'لم يُحفظ ملف DIN بعد.';
@@ -345,9 +390,34 @@ function renderDinSummary(profile) {
 function saveDinProfile(event) {
   event.preventDefault();
   const profile = readDinForm();
+  const coverage = profile.irrigation.coverageCoefficient;
+  const efficiency = profile.irrigation.efficiency;
+  const fc = profile.soil.fieldCapacity;
+  const wp = profile.soil.wiltingPoint;
+  const mad = profile.soil.mad;
   if (!profile.field.name || profile.field.area == null || profile.field.area <= 0) {
     $('din-message').className = 'data-message error-message';
     $('din-message').textContent = 'أدخل اسم الحقل ومساحة أكبر من صفر قبل الحفظ.';
+    return;
+  }
+  if (coverage == null || coverage < 0 || coverage > 1) {
+    $('din-message').className = 'data-message error-message';
+    $('din-message').textContent = 'معامل التغطية يجب أن يكون بين 0 و1.';
+    return;
+  }
+  if (profile.irrigation.method && (efficiency == null || efficiency <= 0 || efficiency > 1)) {
+    $('din-message').className = 'data-message error-message';
+    $('din-message').textContent = 'أدخل كفاءة ري أكبر من صفر ولا تتجاوز 1.';
+    return;
+  }
+  if (fc != null && wp != null && fc < wp) {
+    $('din-message').className = 'data-message error-message';
+    $('din-message').textContent = 'السعة الحقلية FC يجب أن تكون أكبر من أو تساوي نقطة الذبول WP.';
+    return;
+  }
+  if (mad != null && (mad < 0 || mad > 1)) {
+    $('din-message').className = 'data-message error-message';
+    $('din-message').textContent = 'نسبة الاستنزاف المسموح MAD يجب أن تكون بين 0 و1.';
     return;
   }
   profile.savedAt = new Date().toISOString();
@@ -361,6 +431,7 @@ function clearDinProfile() {
   state.din = profile;
   try { sessionStorage.removeItem(DIN_STORAGE_KEY); } catch (error) { console.warn('تعذر مسح ملف DIN.', error); }
   populateDinForm(profile);
+  updateEfficiencyHint();
   renderDinSummary(profile);
 }
 
@@ -555,10 +626,12 @@ async function init() {
     state.din = readDinProfile();
     populateDinForm(state.din);
     updateRootDepthHint();
+    updateEfficiencyHint();
     renderDinSummary(state.din);
     $('controls-form').addEventListener('submit', (event) => { event.preventDefault(); refresh(); });
     $('din-form').addEventListener('submit', saveDinProfile);
     $('din-clear').addEventListener('click', clearDinProfile);
+    $('irrigation-method').addEventListener('change', () => updateEfficiencyHint(true));
     $('crop-select').addEventListener('change', () => {
       $('crop-summary').textContent = state.catalog.records.find((crop) => crop.id === $('crop-select').value)?.name_ar || '—';
       updateRootDepthHint();

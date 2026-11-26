@@ -88,7 +88,7 @@
           <div>
             <p class="eyebrow">DIN · المرحلة الأولى</p>
             <h2 id="din-title">ملف الحقل والتربة وطريقة الري</h2>
-            <p class="section-lead">نسجل مدخلات الحقل كما يحتاجها DIN، من دون إدخالها في حساب ET0 أو Kc أو إنتاج توصية ري نهائية في هذه المرحلة.</p>
+            <p class="section-lead">نسجل مدخلات الحقل كما يحتاجها DIN، ونحسب منها مؤشرات تربة أولية، مع إبقاء توصية الري النهائية منفصلة حتى اعتماد سياسة المطر الفعال.</p>
           </div>
           <span class="status-pill neutral">مدخلات قابلة للمراجعة</span>
         </div>
@@ -139,6 +139,13 @@
                   <input id="soil-root-depth" type="number" min="0" max="300" step="1" placeholder="أدخل القيمة" />
                   <small id="root-depth-hint" class="field-hint">المرجع المحلي للمحصول سيظهر هنا</small>
                 </label>
+                <label><span>السعة الحقلية FC (%)</span><input id="soil-field-capacity" type="number" min="0" max="100" step="0.1" placeholder="نسبة حجمية" /></label>
+                <label><span>نقطة الذبول WP (%)</span><input id="soil-wilting-point" type="number" min="0" max="100" step="0.1" placeholder="نسبة حجمية" /></label>
+                <label>
+                  <span>الاستنزاف المسموح MAD</span>
+                  <input id="soil-mad" type="number" min="0" max="1" step="0.01" placeholder="0–1" />
+                  <small class="field-hint">معيار يحدده المستخدم، وليس قيمة تلقائية</small>
+                </label>
                 <label><span>pH</span><input id="soil-ph" type="number" min="0" max="14" step="0.01" placeholder="—" /></label>
                 <label><span>EC (dS/m)</span><input id="soil-ec" type="number" min="0" step="0.01" placeholder="—" /></label>
                 <label><span>المادة العضوية (%)</span><input id="soil-organic-matter" type="number" min="0" step="0.01" placeholder="—" /></label>
@@ -149,7 +156,7 @@
             </article>
 
             <article class="din-card din-card-wide">
-              <div class="din-card-heading"><span class="din-index">03</span><div><h3>طريقة الري والهيدروليك</h3><p>توثيق مدخلات DIN فقط؛ لن تستخدم في حساب ساعات التشغيل قبل اعتماد سياسة الكفاءة والمطر الفعال.</p></div></div>
+              <div class="din-card-heading"><span class="din-index">03</span><div><h3>طريقة الري والهيدروليك</h3><p>الكفاءة ومعامل التغطية قابلان للتعديل، بينما تبقى كمية المطر مدخلًا يدويًا منفصلًا عن التوقعات.</p></div></div>
               <div class="din-fields four-columns">
                 <label>
                   <span>طريقة الري</span>
@@ -161,6 +168,21 @@
                     <option value="external_emitters">نقاطات خارجية</option>
                     <option value="other">طريقة أخرى</option>
                   </select>
+                </label>
+                <label>
+                  <span>معامل التغطية C</span>
+                  <input id="coverage-coefficient" type="number" min="0" max="1" step="0.01" value="1" />
+                  <small class="field-hint">المحاصيل: المساحة المروية فعليًا ÷ المساحة الكلية؛ الأشجار: مسقط الشجرة ÷ المساحة الفعلية</small>
+                </label>
+                <label>
+                  <span>كفاءة الري</span>
+                  <input id="irrigation-efficiency" type="number" min="0.01" max="1" step="0.01" placeholder="تتحدد حسب الطريقة" />
+                  <small id="efficiency-hint" class="field-hint">قيمة ابتدائية قابلة للتعديل</small>
+                </label>
+                <label>
+                  <span>المطر الهاطل خلال الأسبوع (ملم)</span>
+                  <input id="weekly-rain" type="number" min="0" step="0.1" placeholder="إدخال المستخدم" />
+                  <small class="field-hint">مطر كلي مدخل يدويًا، وليس مطرًا فعالًا تلقائيًا</small>
                 </label>
                 <label><span>التصريف (لتر/ساعة)</span><input id="irrigation-discharge" type="number" min="0" step="0.01" placeholder="للنقاطات/المرشات" /></label>
                 <label><span>عدد النقاطات/المرشات</span><input id="irrigation-units" type="number" min="0" step="1" placeholder="—" /></label>
@@ -186,6 +208,11 @@
           <div><span>التربة</span><strong id="din-summary-soil">—</strong></div>
           <div><span>الري</span><strong id="din-summary-irrigation">—</strong></div>
           <div><span>الفاصل</span><strong id="din-summary-interval">—</strong></div>
+        </div>
+        <div class="din-balance" aria-live="polite">
+          <div><span>TAW الماء المتاح الكلي</span><strong id="din-taw">—</strong><small>ملم · من FC/WP وعمق الجذور</small></div>
+          <div><span>RAW الماء المتاح السهل</span><strong id="din-raw">—</strong><small>ملم · TAW × MAD</small></div>
+          <div><span>المطر الأسبوعي المدخل</span><strong id="din-rain-input">—</strong><small>ملم · قبل حساب المطر الفعال</small></div>
         </div>
       </section>
 
