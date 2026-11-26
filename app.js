@@ -207,7 +207,7 @@ function defaultDinProfile() {
     version: '0.1.0',
     field: { name: '', area: null, areaUnit: 'dunum', code: '' },
     soil: { texture: '', rootDepthCm: null, fieldCapacity: null, wiltingPoint: null, mad: null, ph: null, ec: null, organicMatter: null, n: null, p: null, k: null },
-    irrigation: { method: '', coverageCoefficient: 1, efficiency: null, weeklyRain: null, dischargeLph: null, units: null, spacingM: null, coverageM: null, intensityMmHour: null, intervalDays: null },
+    irrigation: { method: '', coverageCoefficient: 1, efficiency: null, weeklyRain: null, dailyRain: {}, dischargeLph: null, units: null, spacingM: null, coverageM: null, intensityMmHour: null, intervalDays: null },
     savedAt: null
   };
 }
@@ -220,7 +220,7 @@ function normaliseDinProfile(raw) {
     ...raw,
     field: { ...fallback.field, ...(raw.field || {}) },
     soil: { ...fallback.soil, ...(raw.soil || {}) },
-    irrigation: { ...fallback.irrigation, ...(raw.irrigation || {}) }
+    irrigation: { ...fallback.irrigation, ...(raw.irrigation || {}), dailyRain: { ...fallback.irrigation.dailyRain, ...((raw.irrigation || {}).dailyRain || {}) } }
   };
 }
 
@@ -274,6 +274,7 @@ function readDinForm() {
       coverageCoefficient: optionalNumber('coverage-coefficient'),
       efficiency: optionalNumber('irrigation-efficiency'),
       weeklyRain: optionalNumber('weekly-rain'),
+      dailyRain: { ...(state.din?.irrigation?.dailyRain || {}) },
       dischargeLph: optionalNumber('irrigation-discharge'),
       units: optionalNumber('irrigation-units'),
       spacingM: optionalNumber('irrigation-spacing'),
@@ -356,22 +357,57 @@ function areaToHectares(area, unit) {
   return area * 0.1;
 }
 
+function simulateDailySoilWater(profile, rows, referenceDate) {
+  const water = calculateSoilWater(profile);
+  if (water.taw == null) return { rows: [], taw: null, raw: null, reason: 'أكمل FC وWP وعمق الجذور وMAD' };
+  const coverage = Number(profile.irrigation.coverageCoefficient);
+  if (!Number.isFinite(coverage) || coverage < 0 || coverage > 1) return { rows: [], taw: water.taw, raw: water.raw, reason: 'أدخل معامل التغطية C بين 0 و1' };
+  const dailyRain = profile.irrigation.dailyRain || {};
+  const rootDepth = Number(profile.soil.rootDepthCm);
+  let storage = water.taw;
+  const simulated = (rows || [])
+    .filter((row) => row.date <= (referenceDate || '9999-12-31') && row.etc != null)
+    .map((row) => {
+      const etcAdjusted = row.etc * DIN_KR_DEFAULT * coverage;
+      const hasManualRain = Object.prototype.hasOwnProperty.call(dailyRain, row.date);
+      const storedRain = hasManualRain ? Number(dailyRain[row.date]) : Number(row.rain || 0);
+      const rain = Number.isFinite(storedRain) && storedRain >= 0 ? storedRain : 0;
+      const effectiveRain = Math.min(rain, Math.max(0, water.taw - storage));
+      storage = Math.max(0, Math.min(water.taw, storage + effectiveRain - etcAdjusted));
+      const moisturePct = Math.max(0, Math.min(100, (storage / water.taw) * 100));
+      const depletion = water.taw - storage;
+      return {
+        ...row,
+        rainInput: rain,
+        rainSource: hasManualRain ? 'manual' : 'weather',
+        etcAdjusted,
+        effectiveRain,
+        soilWaterMm: storage,
+        soilMoisturePct: moisturePct,
+        depletion,
+        madReached: water.raw != null && depletion >= water.raw
+      };
+    });
+  return { rows: simulated, taw: water.taw, raw: water.raw, reason: null };
+}
+
 function calculateWeeklyDinBalance(profile, rows, referenceDate) {
-  const eligible = (rows || []).filter((row) => row.date <= (referenceDate || '9999-12-31') && row.etc != null).slice(-7);
+  const simulation = simulateDailySoilWater(profile, rows, referenceDate);
+  const eligible = simulation.rows.length ? simulation.rows.slice(-7) : (rows || []).filter((row) => row.date <= (referenceDate || '9999-12-31') && row.etc != null).slice(-7);
   const weeklyEtc = eligible.length ? eligible.reduce((sum, row) => sum + row.etc, 0) : null;
   const asNumber = (value) => value == null || value === '' ? null : Number(value);
   const coverage = asNumber(profile.irrigation.coverageCoefficient);
   const weeklyRain = asNumber(profile.irrigation.weeklyRain);
   const efficiency = asNumber(profile.irrigation.efficiency);
   const intensity = asNumber(profile.irrigation.intensityMmHour);
-  const coveredDemand = weeklyEtc != null && Number.isFinite(coverage) ? weeklyEtc * DIN_KR_DEFAULT * coverage : null;
-  const effectiveRain = coveredDemand != null && Number.isFinite(weeklyRain) ? Math.min(Math.max(0, weeklyRain), coveredDemand) : null;
+  const coveredDemand = eligible.length && simulation.rows.length ? eligible.reduce((sum, row) => sum + row.etcAdjusted, 0) : weeklyEtc != null && Number.isFinite(coverage) ? weeklyEtc * DIN_KR_DEFAULT * coverage : null;
+  const effectiveRain = eligible.length && simulation.rows.length ? eligible.reduce((sum, row) => sum + row.effectiveRain, 0) : coveredDemand != null && Number.isFinite(weeklyRain) ? Math.min(Math.max(0, weeklyRain), coveredDemand) : null;
   const netNeed = coveredDemand != null && effectiveRain != null ? Math.max(0, coveredDemand - effectiveRain) : null;
   const grossNeed = netNeed != null && Number.isFinite(efficiency) && efficiency > 0 && efficiency <= 1 ? netNeed / efficiency : null;
   const areaHa = areaToHectares(asNumber(profile.field.area), profile.field.areaUnit);
   const volume = grossNeed != null && areaHa != null ? grossNeed * areaHa * 10 : null;
   const hours = grossNeed != null && Number.isFinite(intensity) && intensity > 0 ? grossNeed / intensity : null;
-  return { weeklyEtc, effectiveRain, netNeed, grossNeed, volume, hours, eligibleDays: eligible.length, usedForecast: eligible.some((row) => row.state === 'forecast') };
+  return { weeklyEtc, effectiveRain, netNeed, grossNeed, volume, hours, eligibleDays: eligible.length, usedForecast: eligible.some((row) => row.state === 'forecast'), dailySimulation: simulation };
 }
 
 function updateRootDepthHint() {
@@ -422,6 +458,72 @@ function renderDinBalance(profile, rows = state.rows, referenceDate = state.refe
   }
 }
 
+function renderDailySoilSimulation(profile, rows = state.rows, referenceDate = state.referenceDate) {
+  const result = simulateDailySoilWater(profile, rows, referenceDate);
+  const body = $('din-daily-body');
+  const status = $('din-daily-status');
+  if (!result.rows.length) {
+    status.className = 'status-pill neutral';
+    status.textContent = result.reason || 'بانتظار بيانات الطقس';
+    body.innerHTML = `<tr><td colspan="7" class="table-empty">${escapeHtml(result.reason || 'لا توجد أيام قابلة للمحاكاة بعد.')}</td></tr>`;
+    return;
+  }
+  const madReached = result.rows.some((row) => row.madReached);
+  status.className = madReached ? 'status-pill loading' : 'status-pill success';
+  status.textContent = madReached ? 'تجاوز RAW في يوم أو أكثر' : 'الرصيد ضمن RAW';
+  body.innerHTML = result.rows.map((row) => `<tr>
+    <td class="table-date">${escapeHtml(dateLabel(row.date))}</td>
+    <td class="num">${formatNumber(row.etcAdjusted, 2)}</td>
+    <td class="num"><span class="rain-cell ${row.rainSource === 'manual' ? 'manual-rain' : ''}">${formatNumber(row.rainInput, 2)}<small>${row.rainSource === 'manual' ? 'يدوي' : 'طقس'}</small></span></td>
+    <td class="num">${formatNumber(row.effectiveRain, 2)}</td>
+    <td class="num"><b>${formatNumber(row.soilWaterMm, 2)}</b></td>
+    <td class="num">${formatNumber(row.soilMoisturePct, 1)}%</td>
+    <td><span class="stage-chip ${row.madReached ? 'soil-alert' : ''}">${row.madReached ? 'بلغ RAW' : 'ضمن الحد'}</span></td>
+  </tr>`).join('');
+}
+
+function renderRainEntries(profile) {
+  const entries = Object.entries(profile.irrigation.dailyRain || {}).sort(([a], [b]) => a.localeCompare(b));
+  $('rain-entry-count').textContent = entries.length ? `${entries.length} إدخال` : 'لا توجد إدخالات';
+  $('rain-entry-body').innerHTML = entries.length ? entries.map(([date, amount]) => `<tr><td class="table-date">${escapeHtml(date)}</td><td class="num">${formatNumber(amount, 2)}</td><td><button class="table-action rain-delete" type="button" data-date="${escapeHtml(date)}">حذف</button></td></tr>`).join('') : '<tr><td colspan="3" class="table-empty">لا توجد إدخالات يدوية بعد.</td></tr>';
+}
+
+function refreshDinDisplays() {
+  renderDinSummary(state.din, state.rows, state.referenceDate);
+  renderDailySoilSimulation(state.din, state.rows, state.referenceDate);
+  renderRainEntries(state.din);
+}
+
+function addDailyRain(event) {
+  event.preventDefault();
+  const date = $('rain-entry-date').value;
+  const amount = optionalNumber('rain-entry-amount');
+  if (!date || amount == null || amount < 0) return;
+  const profile = normaliseDinProfile(state.din);
+  profile.irrigation.dailyRain[date] = amount;
+  state.din = profile;
+  writeDinProfile(profile);
+  refreshDinDisplays();
+}
+
+function deleteDailyRain(event) {
+  const button = event.target.closest('.rain-delete');
+  if (!button) return;
+  const profile = normaliseDinProfile(state.din);
+  delete profile.irrigation.dailyRain[button.dataset.date];
+  state.din = profile;
+  writeDinProfile(profile);
+  refreshDinDisplays();
+}
+
+function openRainModal() {
+  const modal = $('rain-modal');
+  $('rain-entry-date').value = state.referenceDate || damascusToday();
+  renderRainEntries(state.din);
+  if (typeof modal.showModal === 'function') modal.showModal();
+  else modal.setAttribute('open', '');
+}
+
 function renderDinSummary(profile, rows = state.rows, referenceDate = state.referenceDate) {
   const data = normaliseDinProfile(profile);
   const area = data.field.area != null ? `${formatNumber(data.field.area, 2)} ${dinAreaLabels[data.field.areaUnit] || ''}` : '—';
@@ -442,6 +544,7 @@ function renderDinSummary(profile, rows = state.rows, referenceDate = state.refe
   $('din-raw').textContent = water.raw != null ? `${formatNumber(water.raw, 2)} ملم` : '—';
   $('din-rain-input').textContent = data.irrigation.weeklyRain != null ? `${formatNumber(data.irrigation.weeklyRain, 1)} ملم` : '—';
   renderDinBalance(data, rows, referenceDate);
+  renderDailySoilSimulation(data, rows, referenceDate);
   const message = $('din-message');
   if (data.savedAt) {
     const saved = new Intl.DateTimeFormat('ar-SY', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }).format(new Date(data.savedAt));
@@ -696,9 +799,15 @@ async function init() {
     updateRootDepthHint();
     updateEfficiencyHint();
     renderDinSummary(state.din);
+    renderRainEntries(state.din);
     $('controls-form').addEventListener('submit', (event) => { event.preventDefault(); refresh(); });
     $('din-form').addEventListener('submit', saveDinProfile);
     $('din-clear').addEventListener('click', clearDinProfile);
+    $('rain-entry-open').addEventListener('click', openRainModal);
+    $('rain-entry-form').addEventListener('submit', addDailyRain);
+    $('rain-entry-body').addEventListener('click', deleteDailyRain);
+    $('rain-modal-close').addEventListener('click', () => $('rain-modal').close());
+    $('rain-modal').addEventListener('click', (event) => { if (event.target === $('rain-modal')) $('rain-modal').close(); });
     $('irrigation-method').addEventListener('change', () => updateEfficiencyHint(true));
     $('crop-select').addEventListener('change', () => {
       $('crop-summary').textContent = state.catalog.records.find((crop) => crop.id === $('crop-select').value)?.name_ar || '—';
