@@ -67,6 +67,13 @@ input:focus, select:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgb
 .primary-button:hover { background: var(--teal-deep); transform: translateY(-1px); }
 .primary-button:disabled { opacity: .6; cursor: wait; transform: none; }
 .control-action small { color: var(--ink-soft); font-size: 10px; white-space: nowrap; }
+.season-status { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 10px 13px; border: 1px solid var(--line); border-radius: 11px; font-size: 11px; }
+.season-status strong { white-space: nowrap; }
+.season-status span { color: var(--ink-soft); }
+.neutral-season { background: #f3f6f2; color: var(--ink-soft); }
+.active-season { background: var(--mint); border-color: #c6e4d1; color: var(--teal-deep); }
+.before-season { background: var(--blue-soft); border-color: #cfe3f1; color: #1e638d; }
+.ended-season { background: var(--gold-soft); border-color: #efd9b4; color: #8b5d13; }
 .din-panel { margin-top: 16px; padding: 24px 26px 22px; }
 .section-lead { max-width: 760px; margin: 6px 0 0; color: var(--ink-soft); font-size: 12px; }
 .din-form { display: block; }

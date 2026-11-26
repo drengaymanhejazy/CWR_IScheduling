@@ -199,7 +199,13 @@ function kcForDay(crop, dayFromStart) {
   if (d < l3) return { kc: mid, stage: 'L3' };
   d -= l3;
   if (d < l4) return { kc: mid + ((d + 1) / l4) * (end - mid), stage: 'L4' };
-  return { kc: end, stage: 'post_season' };
+  return { kc: null, stage: 'post_season' };
+}
+
+function cropSeasonInfo(crop, seasonStart) {
+  const totalDays = [crop?.L1, crop?.L2, crop?.L3, crop?.L4].map(Number).reduce((sum, value) => sum + (Number.isFinite(value) && value > 0 ? value : 0), 0);
+  if (!crop || !seasonStart || totalDays <= 0) return { totalDays: null, endDate: null };
+  return { totalDays, endDate: addDays(seasonStart, totalDays - 1) };
 }
 
 function defaultDinProfile() {
@@ -742,6 +748,27 @@ function stageLabel(stage) {
   return ({ L1: 'L1 · التأسيس', L2: 'L2 · النمو', L3: 'L3 · منتصف الموسم', L4: 'L4 · النضج', post_season: 'بعد الموسم', before_season: 'قبل الموسم' })[stage] || stage;
 }
 
+function renderSeasonStatus() {
+  const crop = state.catalog?.records.find((item) => item.id === $('crop-select').value);
+  const start = $('season-start').value;
+  const status = $('season-status');
+  const title = $('season-status-title');
+  const detail = $('season-status-detail');
+  const info = cropSeasonInfo(crop, start);
+  if (!info.endDate) {
+    status.className = 'season-status neutral-season';
+    title.textContent = 'حالة الموسم';
+    detail.textContent = 'اختر المحصول وأدخل بداية الموسم لعرض تاريخ النهاية.';
+    return;
+  }
+  const weatherDate = $('weather-date').value;
+  const ended = weatherDate > info.endDate;
+  const before = weatherDate < start;
+  status.className = `season-status ${ended ? 'ended-season' : before ? 'before-season' : 'active-season'}`;
+  title.textContent = ended ? 'الموسم منتهٍ' : before ? 'الموسم لم يبدأ بعد' : 'الموسم قائم';
+  detail.textContent = `${crop.name_ar} · من ${start} إلى ${info.endDate} (${info.totalDays} يومًا). ${ended ? 'لن يُحسب ETc محصولي بعد تاريخ النهاية.' : before ? 'لن يُحسب ETc قبل تاريخ البداية.' : 'يُحسب Kc وETc وفق الطور اليومي.'}`;
+}
+
 function dateLabel(date) {
   return new Intl.DateTimeFormat('ar-SY', { weekday: 'short', day: '2-digit', month: '2-digit' }).format(new Date(`${date}T12:00:00`));
 }
@@ -832,6 +859,7 @@ function render(rows, metadata) {
   $('crop-summary').textContent = crop.name_ar;
   $('updated-at').textContent = new Intl.DateTimeFormat('ar-SY', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }).format(new Date());
   renderSummary(rows, metadata.today);
+  renderSeasonStatus();
   renderDinSummary(state.din, rows, metadata.referenceDate);
   renderChart(rows);
   renderTable(rows);
@@ -888,6 +916,7 @@ async function init() {
     populateDinForm(state.din);
     updateRootDepthHint();
     updateEfficiencyHint();
+    renderSeasonStatus();
     renderDinSummary(state.din);
     renderRainEntries(state.din);
     renderIrrigationEntries(state.din);
@@ -909,7 +938,10 @@ async function init() {
     $('crop-select').addEventListener('change', () => {
       $('crop-summary').textContent = state.catalog.records.find((crop) => crop.id === $('crop-select').value)?.name_ar || '—';
       updateRootDepthHint();
+      renderSeasonStatus();
     });
+    $('season-start').addEventListener('change', renderSeasonStatus);
+    $('weather-date').addEventListener('change', renderSeasonStatus);
     $('location-name').addEventListener('change', () => applyLocation(selectedLocation()));
     await refresh();
   } catch (error) {
