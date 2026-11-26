@@ -152,6 +152,16 @@
                 <label><span>N (mg/kg)</span><input id="soil-n" type="number" min="0" step="0.01" placeholder="—" /></label>
                 <label><span>P (mg/kg)</span><input id="soil-p" type="number" min="0" step="0.01" placeholder="—" /></label>
                 <label><span>K (mg/kg)</span><input id="soil-k" type="number" min="0" step="0.01" placeholder="—" /></label>
+                <label>
+                  <span>حالة الرصيد الابتدائي</span>
+                  <select id="soil-initial-state">
+                    <option value="field_capacity">عند السعة الحقلية FC</option>
+                    <option value="manual_deficit">عجز ابتدائي أدخله يدويًا</option>
+                    <option value="carryover">استخدم رصيد نهاية الفترة السابقة</option>
+                  </select>
+                  <small class="field-hint">يحدد ماء التربة في أول يوم من المحاكاة</small>
+                </label>
+                <label><span>العجز الابتدائي (ملم)</span><input id="soil-initial-deficit" type="number" min="0" step="0.1" placeholder="يستخدم عند اختيار العجز اليدوي" /></label>
               </div>
             </article>
 
@@ -198,6 +208,7 @@
             <button class="primary-button" type="submit">حفظ ملف DIN في الجلسة</button>
             <button id="din-clear" class="secondary-button" type="button">مسح المدخلات</button>
             <button id="rain-entry-open" class="secondary-button" type="button">إدخال المطر اليومي</button>
+            <button id="irrigation-entry-open" class="secondary-button" type="button">تسجيل الري الفعلي</button>
             <small>الحفظ محلي في جلسة المتصفح، ولا يرسل تحليل التربة إلى أي خادم.</small>
           </div>
           <div id="din-message" class="data-message neutral-message">لم يُحفظ ملف DIN بعد.</div>
@@ -229,8 +240,10 @@
         </div>
         <div class="din-daily-output" aria-live="polite">
           <div class="din-output-heading"><div><span class="notice-kicker">محاكاة يومية · رصيد منطقة الجذور</span><h3>تغير رطوبة التربة خلال الفترة المتاحة</h3></div><span id="din-daily-status" class="status-pill neutral">بانتظار خصائص التربة</span></div>
-          <p class="din-output-note">يبدأ الرصيد من السعة الحقلية عند غياب رصيد سابق. المطر الفعال يوميًا هو الجزء الذي يملأ السعة التخزينية المتبقية، وأي فائض يصبح غير فعال. لا يتضمن هذا الإصدار جريانًا سطحيًا أو تسربًا محسوبًا.</p>
-          <div class="table-scroll din-daily-table-wrap"><table><thead><tr><th>التاريخ</th><th>ETc<br><small>ملم</small></th><th>المطر المدخل<br><small>ملم</small></th><th>المطر الفعال<br><small>ملم</small></th><th>ماء التربة<br><small>ملم</small></th><th>رطوبة نسبية<br><small>% من FC–WP</small></th><th>الحالة</th></tr></thead><tbody id="din-daily-body"><tr><td colspan="7" class="table-empty">أدخل FC وWP وعمق الجذور ثم حدّث الطقس.</td></tr></tbody></table></div>
+          <p class="din-output-note">يبدأ الرصيد وفق الحالة الابتدائية المختارة: السعة الحقلية أو عجز يدوي أو رصيد مرحّل. المطر الفعال يوميًا هو الجزء الذي يملأ السعة التخزينية المتبقية، وأي فائض يصبح غير فعال. لا يتضمن هذا الإصدار جريانًا سطحيًا أو تسربًا محسوبًا.</p>
+          <div class="table-scroll din-daily-table-wrap"><table><thead><tr><th>التاريخ</th><th>ETc<br><small>ملم</small></th><th>المطر المدخل<br><small>ملم</small></th><th>المطر الفعال<br><small>ملم</small></th><th>الري الفعلي<br><small>ملم</small></th><th>ماء التربة<br><small>ملم</small></th><th>رطوبة نسبية<br><small>% من FC–WP</small></th><th>الحالة</th></tr></thead><tbody id="din-daily-body"><tr><td colspan="8" class="table-empty">أدخل FC وWP وعمق الجذور ثم حدّث الطقس.</td></tr></tbody></table></div>
+          <div id="din-soil-chart" class="din-soil-chart" aria-label="رسم تغير ماء التربة اليومي"><div class="empty-state">سيظهر الرسم بعد اكتمال خصائص التربة والطقس.</div></div>
+          <div class="din-daily-actions"><button id="soil-carryover-save" class="secondary-button" type="button">اعتماد رصيد نهاية الفترة كبداية لاحقة</button><small id="soil-carryover-note">الرصيد المحفوظ لا يُستخدم إلا عند اختيار «استخدم رصيد نهاية الفترة السابقة».</small></div>
         </div>
       </section>
 
@@ -241,6 +254,15 @@
           <div class="rain-entry-fields"><label><span>التاريخ</span><input id="rain-entry-date" type="date" required /></label><label><span>الكمية (ملم)</span><input id="rain-entry-amount" type="number" min="0" step="0.1" required placeholder="0.0" /></label><button id="rain-entry-add" class="primary-button" type="submit">إضافة / تحديث</button></div>
           <div class="rain-list-heading"><strong>القيم اليدوية المحفوظة</strong><small id="rain-entry-count">لا توجد إدخالات</small></div>
           <div class="table-scroll rain-list-wrap"><table><thead><tr><th>التاريخ</th><th>الكمية (ملم)</th><th>الإجراء</th></tr></thead><tbody id="rain-entry-body"><tr><td colspan="3" class="table-empty">لا توجد إدخالات يدوية بعد.</td></tr></tbody></table></div>
+        </form>
+      </dialog>
+      <dialog id="irrigation-modal" class="rain-modal">
+        <form id="irrigation-entry-form" method="dialog">
+          <div class="rain-modal-heading"><div><span class="notice-kicker">سجل التشغيل</span><h2>تسجيل الري الفعلي</h2></div><button id="irrigation-modal-close" class="modal-close" type="button" aria-label="إغلاق">×</button></div>
+          <p>أدخل كمية الري الإجمالية المطبقة في يوم محدد. يحولها النموذج إلى كمية فعالة باستخدام كفاءة الري المسجلة.</p>
+          <div class="rain-entry-fields"><label><span>التاريخ</span><input id="irrigation-entry-date" type="date" required /></label><label><span>الكمية المطبقة (ملم)</span><input id="irrigation-entry-amount" type="number" min="0" step="0.1" required placeholder="0.0" /></label><label><span>ساعات التشغيل <small class="optional-label">اختياري</small></span><input id="irrigation-entry-hours" type="number" min="0" step="0.1" placeholder="—" /></label><button id="irrigation-entry-add" class="primary-button" type="submit">إضافة / تحديث</button></div>
+          <div class="rain-list-heading"><strong>الري الفعلي المحفوظ</strong><small id="irrigation-entry-count">لا توجد إدخالات</small></div>
+          <div class="table-scroll rain-list-wrap"><table><thead><tr><th>التاريخ</th><th>الكمية (ملم)</th><th>الساعات</th><th>الإجراء</th></tr></thead><tbody id="irrigation-entry-body"><tr><td colspan="4" class="table-empty">لا توجد إدخالات فعلية بعد.</td></tr></tbody></table></div>
         </form>
       </dialog>
 
