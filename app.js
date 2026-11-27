@@ -1,8 +1,10 @@
 const TIMEZONE = 'Asia/Damascus';
 const CROP_DATA_URL = '/data/crops_local_syria_v0.1.json';
 const LOCATION_DATA_URL = '/data/locations_syria_v0.1.json';
+const FERTILIZER_MAP_URL = '/data/fertilizer_crop_map_v0.1.json';
+const FERTILIZER_PROFILES_URL = '/data/fertilizer_profiles_soilfert_v0.1.json';
 const DIN_STORAGE_KEY = 'cwr-din-profile-v0.1';
-const state = { catalog: null, locations: null, rows: [], referenceDate: null, loading: false, din: null };
+const state = { catalog: null, locations: null, fertilizerMap: null, fertilizerProfiles: null, rows: [], referenceDate: null, loading: false, din: null };
 
 const $ = (id) => document.getElementById(id);
 const numberOrNull = (value) => {
@@ -575,6 +577,7 @@ function refreshDinDisplays() {
   renderDailySoilSimulation(state.din, state.rows, state.referenceDate);
   renderRainEntries(state.din);
   renderIrrigationEntries(state.din);
+  renderFertilizerRecommendation(state.din);
 }
 
 function addDailyRain(event) {
@@ -638,6 +641,79 @@ function openIrrigationModal() {
   else modal.setAttribute('open', '');
 }
 
+function fertilizerCategory(crop) { return crop?.group_ar === 'الأشجار المثمرة' ? 'tree' : 'crop'; }
+
+function fertilizerClassify(value, type, category, levels) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 0) return null;
+  let index = 0;
+  if (type === 'nitrogen') index = number < 5 ? 0 : number <= 9 ? 1 : number <= 15 ? 2 : number <= 19 ? 3 : 4;
+  if (type === 'phosphorus') index = category === 'tree' ? (number < 3 ? 0 : number <= 6 ? 1 : number <= 9 ? 2 : number <= 12 ? 3 : number <= 15 ? 4 : number <= 18 ? 5 : 6) : (number < 3 ? 0 : number <= 5 ? 1 : number <= 7 ? 2 : number <= 9 ? 3 : number <= 12 ? 4 : 5);
+  if (type === 'potassium') index = category === 'tree' ? (number < 60 ? 0 : number <= 120 ? 1 : number <= 180 ? 2 : number <= 240 ? 3 : number <= 300 ? 4 : number <= 360 ? 5 : number <= 420 ? 6 : 7) : (number < 60 ? 0 : number <= 120 ? 1 : number <= 160 ? 2 : number <= 240 ? 3 : number <= 250 ? 4 : number <= 260 ? 5 : number <= 420 ? 6 : 7);
+  const level = levels?.[type]?.[index];
+  return level ? { index, ...level } : null;
+}
+
+function fertilizerOrganicFactor(value) { return value < 1 ? 1.2 : value <= 2 ? 1 : value <= 3 ? 0.9 : 0.7; }
+
+function fertilizerUnit(profile) {
+  const areaUnit = profile.field.areaUnit;
+  if (areaUnit === 'hectare') return { label: 'كغ/هكتار', divisor: 1 };
+  if (areaUnit === 'm2') return { label: 'كغ/م²', divisor: 10000 };
+  return { label: 'كغ/دونم', divisor: 10 };
+}
+
+function fertilizerRecommendation(profile = state.din) {
+  const crop = state.catalog?.records.find((item) => item.id === $('crop-select').value);
+  const mapping = state.fertilizerMap?.entries.find((item) => item.crop_id === crop?.id);
+  if (!crop || !mapping || !state.fertilizerProfiles) return { status: 'missing', reason: 'لم تُحمّل قاعدة التسميد أو لا يوجد ربط للمحصول.' };
+  if (mapping.mapping_status === 'no_direct_profile') return { status: 'blocked', crop, mapping, reason: mapping.notes_ar };
+  const category = fertilizerCategory(crop);
+  const mode = $('fertilizer-water-mode')?.value || 'irrigated';
+  const profileKey = mapping.soilfert_profiles[mode] ? mode : (mapping.default_profile || Object.keys(mapping.soilfert_profiles)[0]);
+  const profileName = mapping.soilfert_profiles[profileKey];
+  const list = category === 'tree' ? state.fertilizerProfiles.trees : state.fertilizerProfiles.crops;
+  const item = list.find((candidate) => candidate.name === profileName);
+  if (!item) return { status: 'blocked', crop, mapping, reason: `ملف SoilFert «${profileName}» غير موجود في القاعدة المحلية.` };
+  const values = { nitrogen: optionalNumber('soil-n'), phosphorus: optionalNumber('soil-p'), potassium: optionalNumber('soil-k'), organic: optionalNumber('soil-organic-matter') };
+  if (Object.values(values).some((value) => value == null)) return { status: 'incomplete', crop, mapping, item, profileName, values, reason: 'أدخل N وP وK والمادة العضوية لإظهار التوصية.' };
+  const levels = state.fertilizerProfiles.levels;
+  const categoryLevels = levels[category];
+  const diagnosis = { nitrogen: fertilizerClassify(values.nitrogen, 'nitrogen', category, categoryLevels), phosphorus: fertilizerClassify(values.phosphorus, 'phosphorus', category, categoryLevels), potassium: fertilizerClassify(values.potassium, 'potassium', category, categoryLevels), organic: values.organic < 1 ? levels.organic[0] : values.organic <= 2 ? levels.organic[1] : values.organic <= 3 ? levels.organic[2] : levels.organic[3] };
+  const indexes = { nitrogen: diagnosis.nitrogen.index, phosphorus: diagnosis.phosphorus.index, potassium: diagnosis.potassium.index };
+  const base = { nitrogen: item.n[indexes.nitrogen] || 0, phosphorus: item.p[indexes.phosphorus] || 0, potassium: item.k[indexes.potassium] || 0 };
+  const treeAge = category === 'tree' ? ($('fertilizer-tree-age')?.value || 'mature') : 'mature';
+  const treeFactor = category === 'tree' ? (state.fertilizerProfiles.irrigationFactors[mode === 'rainfed' ? 'rainfed' : 'irrigated'] || 1) * (state.fertilizerProfiles.ageFactors[treeAge] || 1) : 1;
+  const adjusted = { nitrogen: base.nitrogen * fertilizerOrganicFactor(values.organic) * treeFactor, phosphorus: base.phosphorus * treeFactor, potassium: base.potassium * treeFactor };
+  const unit = fertilizerUnit(profile);
+  const amounts = { nitrogen: adjusted.nitrogen / unit.divisor, phosphorus: adjusted.phosphorus / unit.divisor, potassium: adjusted.potassium / unit.divisor };
+  const fertilizer = { urea: amounts.nitrogen / state.fertilizerProfiles.fertilizerRates.urea.factor, superPhosphate: amounts.phosphorus / state.fertilizerProfiles.fertilizerRates.superPhosphate.factor, potassiumSulfate: amounts.potassium / state.fertilizerProfiles.fertilizerRates.potassiumSulfate.factor };
+  return { status: mapping.mapping_status === 'fallback_group' ? 'fallback' : 'ready', crop, mapping, item, profileName, values, diagnosis, base, adjusted: amounts, fertilizer, unit, category, mode, treeAge, treeFactor, omFactor: fertilizerOrganicFactor(values.organic) };
+}
+
+function renderFertilizerRecommendation(profile = state.din) {
+  const status = $('fertilizer-status');
+  const note = $('fertilizer-note');
+  const profileName = $('fertilizer-profile-name');
+  const diagnosisNode = $('fertilizer-diagnosis');
+  const recommendationNode = $('fertilizer-recommendation');
+  if (!status || !state.fertilizerProfiles) return;
+  const result = fertilizerRecommendation(profile);
+  profileName.textContent = result.profileName || 'لا يوجد ملف مباشر';
+  if (result.status === 'incomplete' || result.status === 'missing') {
+    status.className = 'status-pill neutral'; status.textContent = 'بيانات ناقصة'; note.textContent = result.reason; diagnosisNode.innerHTML = ''; recommendationNode.innerHTML = ''; return;
+  }
+  if (result.status === 'blocked') {
+    status.className = 'status-pill error'; status.textContent = 'التوصية متوقفة'; note.textContent = `${result.reason} لا يصدر المحرك جرعة تلقائية.`; diagnosisNode.innerHTML = ''; recommendationNode.innerHTML = ''; return;
+  }
+  const warning = result.status === 'fallback';
+  status.className = `status-pill ${warning ? 'loading' : 'success'}`; status.textContent = warning ? 'ربط بديل · مراجعة مطلوبة' : 'توصية إرشادية';
+  note.textContent = `${result.mapping.notes_ar} القيم إرشادية، وتفترض توافق وحدات التحليل مع SoilFert؛ راجع المختص قبل التنفيذ.`;
+  const labels = { nitrogen: 'N', phosphorus: 'P₂O₅', potassium: 'K₂O', organic: 'OM' };
+  diagnosisNode.innerHTML = Object.entries(result.diagnosis).map(([key, value]) => `<div class="fert-diagnosis-card"><span>${labels[key]}</span><strong>${escapeHtml(value.label)}</strong><small>${formatNumber(result.values[key], 1)} · ${escapeHtml(value.range)}</small></div>`).join('');
+  recommendationNode.innerHTML = [['N','النيتروجين',result.adjusted.nitrogen],['P₂O₅','الفوسفور',result.adjusted.phosphorus],['K₂O','البوتاسيوم',result.adjusted.potassium],['يوريا 46%','يوريا',result.fertilizer.urea],['سوبر فوسفات 18%','سوبر فوسفات',result.fertilizer.superPhosphate],['سلفات بوتاسيوم 50%','سلفات بوتاسيوم',result.fertilizer.potassiumSulfate]].map(([symbol,name,amount]) => `<div class="fert-recommendation-card"><span>${symbol}</span><strong>${formatNumber(amount, 1)}</strong><small>${name} · ${result.unit.label}</small></div>`).join('');
+}
+
 function saveSoilCarryover() {
   const result = simulateDailySoilWater(state.din, state.rows, state.referenceDate);
   if (!result.rows.length || result.finalStorage == null) return;
@@ -671,6 +747,7 @@ function renderDinSummary(profile, rows = state.rows, referenceDate = state.refe
   $('din-rain-input').textContent = data.irrigation.weeklyRain != null ? `${formatNumber(data.irrigation.weeklyRain, 1)} ملم` : '—';
   renderDinBalance(data, rows, referenceDate);
   renderDailySoilSimulation(data, rows, referenceDate);
+  renderFertilizerRecommendation(data);
   const message = $('din-message');
   if (data.savedAt) {
     const saved = new Intl.DateTimeFormat('ar-SY', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }).format(new Date(data.savedAt));
@@ -946,9 +1023,11 @@ function populateLocations(locationCatalog) {
 async function init() {
   try {
     $('weather-date').value = damascusToday();
-    const [catalog, locations] = await Promise.all([fetchJson(CROP_DATA_URL), fetchJson(LOCATION_DATA_URL)]);
+    const [catalog, locations, fertilizerMap, fertilizerProfiles] = await Promise.all([fetchJson(CROP_DATA_URL), fetchJson(LOCATION_DATA_URL), fetchJson(FERTILIZER_MAP_URL), fetchJson(FERTILIZER_PROFILES_URL)]);
     state.catalog = catalog;
     state.locations = locations;
+    state.fertilizerMap = fertilizerMap;
+    state.fertilizerProfiles = fertilizerProfiles;
     populateCrops(state.catalog);
     populateLocations(state.locations);
     state.din = readDinProfile();
@@ -974,6 +1053,8 @@ async function init() {
     $('irrigation-modal').addEventListener('click', (event) => { if (event.target === $('irrigation-modal')) $('irrigation-modal').close(); });
     $('soil-carryover-save').addEventListener('click', saveSoilCarryover);
     $('irrigation-method').addEventListener('change', () => updateEfficiencyHint(true));
+    $('fertilizer-water-mode').addEventListener('change', () => renderFertilizerRecommendation(state.din));
+    $('fertilizer-tree-age').addEventListener('change', () => renderFertilizerRecommendation(state.din));
     $('crop-select').addEventListener('change', () => {
       $('crop-summary').textContent = state.catalog.records.find((crop) => crop.id === $('crop-select').value)?.name_ar || '—';
       updateRootDepthHint();

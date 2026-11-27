@@ -237,6 +237,17 @@
           <div><span>RAW الماء المتاح السهل</span><strong id="din-raw">—</strong><small>ملم · TAW × MAD</small></div>
           <div><span>المطر الأسبوعي المدخل</span><strong id="din-rain-input">—</strong><small>ملم · قبل حساب المطر الفعال</small></div>
         </div>
+        <div class="din-fertilizer-output" aria-live="polite">
+          <div class="din-output-heading"><div><span class="notice-kicker">محرك التسميد · SoilFert</span><h3>توصية سمادية إرشادية من تحليل التربة</h3></div><span id="fertilizer-status" class="status-pill neutral">بانتظار تحليل التربة</span></div>
+          <p id="fertilizer-note" class="din-output-note">تُستخدم قيم N/P/K والمادة العضوية المدخلة لتشخيص الخصوبة وربط المحصول بملف SoilFert. لا تُصدر توصية تنفيذية إذا لم يوجد ملف مطابق.</p>
+          <div class="fertilizer-controls">
+            <label><span>نمط الحقل</span><select id="fertilizer-water-mode"><option value="irrigated">مروي</option><option value="rainfed">بعل</option></select></label>
+            <label><span>عمر الأشجار</span><select id="fertilizer-tree-age"><option value="mature">بالغة مثمرة</option><option value="intermediate">متوسطة العمر</option><option value="young">فتية</option></select></label>
+            <div class="fertilizer-profile"><span>ملف SoilFert المستخدم</span><strong id="fertilizer-profile-name">—</strong></div>
+          </div>
+          <div id="fertilizer-diagnosis" class="fertilizer-diagnosis"></div>
+          <div id="fertilizer-recommendation" class="fertilizer-recommendation"></div>
+        </div>
         <div class="din-weekly-output" aria-live="polite">
           <div class="din-output-heading"><div><span class="notice-kicker">الخطوة التالية · ميزان أسبوعي أولي</span><h3>من ETc إلى كمية الري</h3></div><span id="din-balance-status" class="status-pill neutral">بانتظار البيانات</span></div>
           <p class="din-output-note">المطر الفعال المؤقت = الأصغر بين المطر الأسبوعي المدخل والطلب المناخي المغطى. لا يحسب هذا الإصدار التخزين السابق أو الجريان السطحي، لذلك تبقى النتيجة تقديرية للمراجعة.</p>
