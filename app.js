@@ -205,7 +205,37 @@ function kcForDay(crop, dayFromStart) {
 function cropSeasonInfo(crop, seasonStart) {
   const totalDays = [crop?.L1, crop?.L2, crop?.L3, crop?.L4].map(Number).reduce((sum, value) => sum + (Number.isFinite(value) && value > 0 ? value : 0), 0);
   if (!crop || !seasonStart || totalDays <= 0) return { totalDays: null, endDate: null };
-  return { totalDays, endDate: addDays(seasonStart, totalDays - 1) };
+  const lengths = ['L1', 'L2', 'L3', 'L4'].map((key) => Number(crop[key]) || 0);
+  let cursor = seasonStart;
+  const stages = lengths.map((length, index) => {
+    const endDate = length > 0 ? addDays(cursor, length - 1) : cursor;
+    const result = { key: `L${index + 1}`, startDate: cursor, endDate, length };
+    cursor = addDays(endDate, 1);
+    return result;
+  });
+  return { totalDays, endDate: stages.at(-1).endDate, stages, plantingWindow: crop.planting_window || '' };
+}
+
+function parsePlantingWindow(windowText) {
+  const match = String(windowText || '').match(/(\d{1,2})\/(\d{1,2})(?:\s*-\s*(\d{1,2})\/(\d{1,2}))?/);
+  if (!match) return null;
+  const start = { day: Number(match[1]), month: Number(match[2]) };
+  const end = match[3] ? { day: Number(match[3]), month: Number(match[4]) } : start;
+  return { start, end };
+}
+
+function isDateInPlantingWindow(isoDate, windowText) {
+  const parsed = parsePlantingWindow(windowText);
+  if (!parsed || !isoDate) return null;
+  const date = new Date(`${isoDate}T00:00:00Z`);
+  const value = date.getUTCMonth() * 31 + date.getUTCDate();
+  const start = (parsed.start.month - 1) * 31 + parsed.start.day;
+  const end = (parsed.end.month - 1) * 31 + parsed.end.day;
+  return start <= end ? value >= start && value <= end : value >= start || value <= end;
+}
+
+function formatIsoDate(isoDate) {
+  return isoDate ? new Intl.DateTimeFormat('ar-SY', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(`${isoDate}T12:00:00`)) : '—';
 }
 
 function defaultDinProfile() {
@@ -755,18 +785,27 @@ function renderSeasonStatus() {
   const title = $('season-status-title');
   const detail = $('season-status-detail');
   const info = cropSeasonInfo(crop, start);
+  const calendar = $('season-calendar');
+  const setStageDate = (key, value) => { $(`season-${key.toLowerCase()}-date`).textContent = value ? formatIsoDate(value) : '—'; };
+  if (info.stages) info.stages.forEach((stage) => setStageDate(stage.key, stage.endDate));
+  $('season-end-date').textContent = info.endDate ? formatIsoDate(info.endDate) : '—';
   if (!info.endDate) {
     status.className = 'season-status neutral-season';
     title.textContent = 'حالة الموسم';
     detail.textContent = 'اختر المحصول وأدخل بداية الموسم لعرض تاريخ النهاية.';
+    calendar.classList.add('calendar-empty');
     return;
   }
+  calendar.classList.remove('calendar-empty');
   const weatherDate = $('weather-date').value;
   const ended = weatherDate > info.endDate;
   const before = weatherDate < start;
+  const inWindow = isDateInPlantingWindow(start, info.plantingWindow);
+  const currentStage = weatherDate ? kcForDay(crop, daysBetween(start, weatherDate)).stage : null;
+  const windowNote = inWindow === false ? ` تحذير: تاريخ الزراعة خارج النافذة المحلية المقترحة (${info.plantingWindow}).` : ` النافذة المحلية المقترحة: ${info.plantingWindow || 'غير محددة'}.`;
   status.className = `season-status ${ended ? 'ended-season' : before ? 'before-season' : 'active-season'}`;
   title.textContent = ended ? 'الموسم منتهٍ' : before ? 'الموسم لم يبدأ بعد' : 'الموسم قائم';
-  detail.textContent = `${crop.name_ar} · من ${start} إلى ${info.endDate} (${info.totalDays} يومًا). ${ended ? 'لن يُحسب ETc محصولي بعد تاريخ النهاية.' : before ? 'لن يُحسب ETc قبل تاريخ البداية.' : 'يُحسب Kc وETc وفق الطور اليومي.'}`;
+  detail.textContent = `${crop.name_ar} · من ${formatIsoDate(start)} إلى ${formatIsoDate(info.endDate)} (${info.totalDays} يومًا). الطور الحالي: ${stageLabel(currentStage)}. ${ended ? 'لن يُحسب ETc محصولي بعد تاريخ النهاية.' : before ? 'لن يُحسب ETc قبل تاريخ البداية.' : 'يُحسب Kc وETc وفق الطور اليومي.'}${windowNote}`;
 }
 
 function dateLabel(date) {
