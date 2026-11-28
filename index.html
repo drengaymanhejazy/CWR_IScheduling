@@ -304,6 +304,35 @@
         <div class="table-scroll operations-table-wrap"><table><thead><tr><th>التاريخ</th><th>العملية / المدخل</th><th>الحالة</th><th>الكمية</th><th>التكلفة</th><th>المصدر</th><th>الإجراء</th></tr></thead><tbody id="operations-body"><tr><td colspan="7" class="table-empty">لا توجد سجلات لهذا الحقل والموسم.</td></tr></tbody></table></div>
       </section>
 
+      <section class="panel harvest-panel" aria-labelledby="harvest-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">الإنتاج · المرحلة B1</p>
+            <h2 id="harvest-title">سجل الحصاد والإنتاج الخام</h2>
+            <p class="section-lead">نسجل كل حدث حصاد بتاريخ مستقل، مع فصل الكمية الخام عن القابلة للتسويق والفاقد. لا تُحسب أسعار أو إيرادات في هذه المرحلة.</p>
+          </div>
+          <span id="harvest-status" class="status-pill neutral">لا توجد سجلات</span>
+        </div>
+        <form id="harvest-form" class="operation-form">
+          <input id="harvest-edit-id" type="hidden" />
+          <div class="operation-fields harvest-fields">
+            <label><span>تاريخ الحصاد</span><input id="harvest-date" type="date" required /></label>
+            <label><span>رمز الدفعة <small class="optional-label">اختياري</small></span><input id="harvest-lot-code" type="text" placeholder="مثال: H-01" /></label>
+            <label><span>الإنتاج الخام</span><input id="harvest-raw" type="number" min="0.001" step="0.001" required placeholder="قبل الفرز" /></label>
+            <label><span>الكمية القابلة للتسويق <small class="optional-label">اختياري</small></span><input id="harvest-marketable" type="number" min="0" step="0.001" placeholder="إن توفرت" /></label>
+            <label><span>الفاقد / المرفوض <small class="optional-label">اختياري</small></span><input id="harvest-rejected" type="number" min="0" step="0.001" placeholder="إن توفرت" /></label>
+            <label><span>الوحدة</span><select id="harvest-unit"><option value="kg">كغ</option><option value="g">غ</option><option value="ton">طن</option><option value="unit">وحدة</option><option value="package">عبوة</option><option value="crate">صندوق</option><option value="other">أخرى</option></select></label>
+            <label><span>حالة السجل</span><select id="harvest-record-status"><option value="actual">فعلي</option><option value="estimated">تقديري</option></select></label>
+            <label><span>مصدر الكمية</span><select id="harvest-source-type"><option value="user">إدخال المستخدم</option><option value="invoice">فاتورة / محضر</option><option value="advisor">مرشد</option><option value="local_table">جدول محلي</option><option value="history">سجل سابق</option><option value="model">نموذج تقديري</option><option value="other">أخرى</option></select></label>
+            <label class="operation-wide"><span>مرجع أو ملاحظات <small class="optional-label">اختياري</small></span><input id="harvest-notes" type="text" placeholder="ملاحظات الحدث أو مرجع محضر الحصاد" /></label>
+          </div>
+          <div class="operation-actions"><button class="primary-button" type="submit" id="harvest-submit">إضافة حدث الحصاد</button><button class="secondary-button" type="button" id="harvest-reset">تفريغ النموذج</button><button class="secondary-button" type="button" id="harvest-export">تصدير JSON</button><button class="secondary-button" type="button" id="harvest-import-open">استيراد JSON</button><input id="harvest-import-file" type="file" accept="application/json,.json" hidden /><small>يحفظ محليًا في هذا المتصفح فقط.</small></div>
+          <div id="harvest-message" class="data-message neutral-message">أدخل حدث حصاد مرتبطًا بالحقل والموسم الحاليين.</div>
+        </form>
+        <div class="operation-metrics harvest-metrics" aria-live="polite"><div><span>الإنتاج الخام</span><strong id="harvest-total-raw">—</strong><small>السجلات الفعلية أو التقديرية النشطة</small></div><div><span>القابل للتسويق</span><strong id="harvest-total-marketable">—</strong><small>لا يُستنتج عند غياب الإدخال</small></div><div><span>الفاقد / المرفوض</span><strong id="harvest-total-rejected">—</strong><small>حسب الكمية المسجلة</small></div><div><span>الإنتاجية القابلة للتسويق</span><strong id="harvest-yield-area">—</strong><small>حسب مساحة الحقل ووحدته</small></div><div><span>عدد أحداث الحصاد</span><strong id="harvest-count">0</strong><small>للحقل والموسم الحاليين</small></div></div>
+        <div class="table-scroll operations-table-wrap"><table><thead><tr><th>التاريخ</th><th>الدفعة</th><th>خام</th><th>قابل للتسويق</th><th>فاقد / مرفوض</th><th>الحالة والمصدر</th><th>الإجراء</th></tr></thead><tbody id="harvest-body"><tr><td colspan="7" class="table-empty">لا توجد أحداث حصاد لهذا الحقل والموسم.</td></tr></tbody></table></div>
+      </section>
+
       <dialog id="rain-modal" class="rain-modal">
         <form id="rain-entry-form" method="dialog">
           <div class="rain-modal-heading"><div><span class="notice-kicker">بيانات الحقل</span><h2>إدخال المطر اليومي</h2></div><button id="rain-modal-close" class="modal-close" type="button" aria-label="إغلاق">×</button></div>

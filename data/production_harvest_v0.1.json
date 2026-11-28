@@ -1,0 +1,75 @@
+{
+  "schema_version": "production_harvest_v0.1",
+  "record_type": "harvest_events",
+  "description_ar": "قالب محلي لسجل الحصاد والإنتاج الخام والقابل للتسويق والفاقد. السجلات الفارغة لا تمثل بيانات فعلية.",
+  "data_policy": {
+    "local_only": true,
+    "raw_quantity_required": true,
+    "unit_required": true,
+    "actual_or_estimated_required": true,
+    "marketable_and_rejected_are_separate": true,
+    "no_market_price_in_this_stage": true
+  },
+  "identity": {
+    "field_id": null,
+    "season_id": null,
+    "crop_id": null,
+    "area_value": null,
+    "area_unit": null
+  },
+  "allowed_values": {
+    "record_status": ["actual", "estimated", "cancelled", "superseded"],
+    "source_type": ["user", "invoice", "advisor", "local_table", "history", "model", "other"],
+    "quantity_units": ["kg", "g", "ton", "unit", "package", "crate", "other"]
+  },
+  "records": [],
+  "record_contract": {
+    "harvest_id": "معرف محلي فريد لحدث الحصاد",
+    "field_id": "معرف الحقل، إلزامي",
+    "season_id": "معرف الموسم، إلزامي",
+    "crop_id": "معرف المحصول المحلي، إلزامي عند توفره",
+    "harvest_date": "تاريخ الحصاد بصيغة YYYY-MM-DD",
+    "lot_code": "رمز داخلي اختياري لدفعة الحصاد قبل بناء طبقة الجودة",
+    "raw_quantity": "الكمية الخام قبل الفرز",
+    "marketable_quantity": "الكمية القابلة للتسويق إن توفرت",
+    "rejected_quantity": "الكمية المرفوضة أو الفاقد إن توفرت",
+    "unit": "وحدة الكميات الثلاث",
+    "record_status": "actual أو estimated أو cancelled أو superseded",
+    "source_type": "مصدر الكمية أو التاريخ",
+    "source_ref": "مرجع فاتورة أو ملف أو ملاحظة",
+    "notes": "ملاحظات الحصاد"
+  },
+  "validation_rules": [
+    "لا يقبل السجل من دون harvest_id وfield_id وseason_id وharvest_date وraw_quantity وunit.",
+    "raw_quantity يجب أن تكون أكبر من صفر.",
+    "marketable_quantity وrejected_quantity اختياريتان، لكن إذا أدخلتا فلا يجوز أن يكون مجموعهما أكبر من raw_quantity.",
+    "السجلات cancelled وsuperseded لا تدخل المؤشرات الحالية.",
+    "السجل estimated ليس كمية فعلية ولا يستبدل سجل actual.",
+    "لا تُخمن الكمية القابلة للتسويق أو الفاقد عند غيابهما.",
+    "لا توجد أسعار أو إيرادات في هذا العقد."
+  ],
+  "empty_record_template": {
+    "harvest_id": null,
+    "field_id": null,
+    "season_id": null,
+    "crop_id": null,
+    "harvest_date": null,
+    "lot_code": null,
+    "raw_quantity": null,
+    "marketable_quantity": null,
+    "rejected_quantity": null,
+    "unit": "kg",
+    "record_status": "actual",
+    "source_type": "user",
+    "source_ref": null,
+    "notes": null,
+    "created_at": null,
+    "updated_at": null
+  },
+  "conventions": {
+    "date": "YYYY-MM-DD",
+    "quantity_unit_is_shared": true,
+    "decimal_separator": ".",
+    "missing_quantity_means_unknown_not_zero": true
+  }
+}

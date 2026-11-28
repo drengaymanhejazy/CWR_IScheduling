@@ -5,7 +5,8 @@ const FERTILIZER_MAP_URL = '/data/fertilizer_crop_map_v0.1.json';
 const FERTILIZER_PROFILES_URL = '/data/fertilizer_profiles_soilfert_v0.1.json';
 const DIN_STORAGE_KEY = 'cwr-din-profile-v0.1';
 const OPERATIONS_STORAGE_KEY = 'cwr-production-operations-costs-v0.1';
-const state = { catalog: null, locations: null, fertilizerMap: null, fertilizerProfiles: null, rows: [], referenceDate: null, loading: false, din: null, operations: [] };
+const HARVEST_STORAGE_KEY = 'cwr-production-harvest-v0.1';
+const state = { catalog: null, locations: null, fertilizerMap: null, fertilizerProfiles: null, rows: [], referenceDate: null, loading: false, din: null, operations: [], harvest: [] };
 
 const $ = (id) => document.getElementById(id);
 const numberOrNull = (value) => {
@@ -395,6 +396,46 @@ function importOperations(event) {
     event.target.value = '';
   }; reader.readAsText(file);
 }
+
+function harvestId() { return globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : `harvest-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`; }
+function readHarvest() { try { const raw = JSON.parse(localStorage.getItem(HARVEST_STORAGE_KEY) || '[]'); return Array.isArray(raw) ? raw.filter((record) => record && typeof record === 'object') : []; } catch (error) { return []; } }
+function writeHarvest(records) { try { localStorage.setItem(HARVEST_STORAGE_KEY, JSON.stringify(records)); } catch (error) { console.warn('تعذر حفظ سجل الحصاد محليًا.', error); } }
+function currentHarvestRecords() { const context = currentOperationContext(); return state.harvest.filter((record) => record.field_id === context.fieldId && record.season_id === context.seasonId); }
+function harvestQuantityTotal(records, key) {
+  const units = {}; records.filter((record) => !['cancelled', 'superseded'].includes(record.record_status) && record[key] != null).forEach((record) => { units[record.unit] = (units[record.unit] || 0) + Number(record[key]); });
+  const entries = Object.entries(units); return entries.length ? entries.map(([unit, amount]) => `${formatNumber(amount, 2)} ${unit}`).join(' · ') : '—';
+}
+function resetHarvestForm() {
+  $('harvest-edit-id').value = ''; $('harvest-date').value = state.referenceDate || damascusToday(); $('harvest-lot-code').value = ''; $('harvest-raw').value = ''; $('harvest-marketable').value = ''; $('harvest-rejected').value = ''; $('harvest-unit').value = 'kg'; $('harvest-record-status').value = 'actual'; $('harvest-source-type').value = 'user'; $('harvest-notes').value = ''; $('harvest-submit').textContent = 'إضافة حدث الحصاد';
+}
+function renderHarvestMetrics(records) {
+  $('harvest-total-raw').textContent = harvestQuantityTotal(records, 'raw_quantity'); $('harvest-total-marketable').textContent = harvestQuantityTotal(records, 'marketable_quantity'); $('harvest-total-rejected').textContent = harvestQuantityTotal(records, 'rejected_quantity');
+  const context = currentOperationContext(); const area = Number($('field-area').value); const unit = $('field-area-unit').value; const marketableUnits = [...new Set(records.filter((record) => record.marketable_quantity != null).map((record) => record.unit))];
+  const marketable = marketableUnits.length === 1 ? records.filter((record) => record.marketable_quantity != null && !['cancelled', 'superseded'].includes(record.record_status)).reduce((sum, record) => sum + Number(record.marketable_quantity), 0) : null;
+  $('harvest-yield-area').textContent = marketable != null && area > 0 ? `${formatNumber(marketable / area, 2)} ${marketableUnits[0]}/${dinAreaLabels[unit] || unit}` : '—';
+  $('harvest-count').textContent = String(records.filter((record) => !['cancelled', 'superseded'].includes(record.record_status)).length); const status = $('harvest-status'); status.className = `status-pill ${records.length ? 'success' : 'neutral'}`; status.textContent = records.length ? `${records.length} حدث حصاد` : 'لا توجد سجلات';
+}
+function renderHarvest() {
+  const records = currentHarvestRecords().sort((a, b) => String(b.harvest_date).localeCompare(String(a.harvest_date)) || String(b.created_at).localeCompare(String(a.created_at))); renderHarvestMetrics(records); const body = $('harvest-body');
+  if (!records.length) { body.innerHTML = '<tr><td colspan="7" class="table-empty">لا توجد أحداث حصاد لهذا الحقل والموسم.</td></tr>'; return; }
+  const statusLabels = { actual: 'فعلي', estimated: 'تقديري', cancelled: 'ملغى', superseded: 'مستبدل' }; const sourceLabels = operationSourceLabels();
+  body.innerHTML = records.map((record) => {
+    const action = ['cancelled', 'superseded'].includes(record.record_status) ? 'غير نشط' : `<button type="button" class="table-action operation-edit" data-harvest-action="edit" data-harvest-id="${escapeHtml(record.harvest_id)}">تعديل</button><button type="button" class="table-action" data-harvest-action="cancel" data-harvest-id="${escapeHtml(record.harvest_id)}">إلغاء</button>`;
+    const quantity = (key) => record[key] == null ? '—' : `<span class="harvest-quantity">${formatNumber(record[key], 2)} ${escapeHtml(record.unit)}</span>`;
+    return `<tr><td class="table-date">${escapeHtml(formatIsoDate(record.harvest_date))}</td><td>${escapeHtml(record.lot_code || '—')}<small>${escapeHtml(record.notes || '')}</small></td><td>${quantity('raw_quantity')}</td><td>${quantity('marketable_quantity')}</td><td>${quantity('rejected_quantity')}</td><td><span class="harvest-status-chip ${escapeHtml(record.record_status)}">${escapeHtml(statusLabels[record.record_status] || record.record_status)}</span><small>${escapeHtml(sourceLabels[record.source_type] || record.source_type)}</small></td><td>${action}</td></tr>`;
+  }).join('');
+}
+function saveHarvest(event) {
+  event.preventDefault(); const raw = optionalNumber('harvest-raw'); const marketable = optionalNumber('harvest-marketable'); const rejected = optionalNumber('harvest-rejected');
+  if (raw == null || raw <= 0) { $('harvest-message').className = 'data-message error-message'; $('harvest-message').textContent = 'أدخل إنتاجًا خامًا أكبر من صفر.'; return; }
+  if (marketable != null && marketable < 0 || rejected != null && rejected < 0 || marketable != null && rejected != null && marketable + rejected > raw + 1e-9) { $('harvest-message').className = 'data-message error-message'; $('harvest-message').textContent = 'مجموع القابل للتسويق والفاقد لا يجوز أن يتجاوز الإنتاج الخام.'; return; }
+  const context = currentOperationContext(); const now = new Date().toISOString(); const editId = $('harvest-edit-id').value; const previous = state.harvest.find((record) => record.harvest_id === editId); const record = { harvest_id: editId || harvestId(), field_id: context.fieldId, season_id: context.seasonId, crop_id: context.cropId, harvest_date: $('harvest-date').value, lot_code: $('harvest-lot-code').value.trim() || null, raw_quantity: raw, marketable_quantity: marketable, rejected_quantity: rejected, unit: $('harvest-unit').value, record_status: $('harvest-record-status').value, source_type: $('harvest-source-type').value, source_ref: $('harvest-notes').value.trim() || null, notes: $('harvest-notes').value.trim() || null, created_at: previous?.created_at || now, updated_at: now };
+  const index = state.harvest.findIndex((item) => item.harvest_id === record.harvest_id); if (index >= 0) state.harvest[index] = record; else state.harvest.push(record); writeHarvest(state.harvest); resetHarvestForm(); renderHarvest(); $('harvest-message').className = 'data-message neutral-message'; $('harvest-message').textContent = 'تم حفظ حدث الحصاد محليًا. الكمية القابلة للتسويق والفاقد لا تُستنتجان تلقائيًا.';
+}
+function editHarvest(record) { $('harvest-edit-id').value = record.harvest_id; $('harvest-date').value = record.harvest_date || ''; $('harvest-lot-code').value = record.lot_code || ''; $('harvest-raw').value = record.raw_quantity ?? ''; $('harvest-marketable').value = record.marketable_quantity ?? ''; $('harvest-rejected').value = record.rejected_quantity ?? ''; $('harvest-unit').value = record.unit || 'kg'; $('harvest-record-status').value = ['actual', 'estimated'].includes(record.record_status) ? record.record_status : 'estimated'; $('harvest-source-type').value = record.source_type || 'user'; $('harvest-notes').value = record.notes || record.source_ref || ''; $('harvest-submit').textContent = 'حفظ تعديل الحصاد'; $('harvest-form').scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+function handleHarvestTable(event) { const button = event.target.closest('[data-harvest-action]'); if (!button) return; const record = state.harvest.find((item) => item.harvest_id === button.dataset.harvestId); if (!record) return; if (button.dataset.harvestAction === 'edit') editHarvest(record); if (button.dataset.harvestAction === 'cancel') { record.record_status = 'cancelled'; record.updated_at = new Date().toISOString(); writeHarvest(state.harvest); renderHarvest(); } }
+function exportHarvest() { const context = currentOperationContext(); const payload = { schema_version: 'production_harvest_v0.1', record_type: 'harvest_events', exported_at: new Date().toISOString(), identity: context, records: currentHarvestRecords() }; const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `production_harvest_${context.seasonId.replace(/[^a-z0-9_-]+/gi, '_')}.json`; link.click(); URL.revokeObjectURL(url); }
+function importHarvest(event) { const file = event.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => { try { const parsed = JSON.parse(reader.result); const records = Array.isArray(parsed) ? parsed : parsed.records; if (!Array.isArray(records)) throw new Error('لا توجد قائمة records صالحة.'); const context = currentOperationContext(); const valid = records.filter((record) => record && record.harvest_id && record.field_id === context.fieldId && record.season_id === context.seasonId && record.harvest_date && Number(record.raw_quantity) > 0); const existingIds = new Set(state.harvest.map((record) => record.harvest_id)); valid.forEach((record) => { if (existingIds.has(record.harvest_id)) state.harvest[state.harvest.findIndex((item) => item.harvest_id === record.harvest_id)] = record; else state.harvest.push(record); }); writeHarvest(state.harvest); renderHarvest(); $('harvest-message').className = 'data-message neutral-message'; $('harvest-message').textContent = `تم استيراد ${valid.length} حدث حصاد مطابقًا للحقل والموسم الحاليين.`; } catch (error) { $('harvest-message').className = 'data-message error-message'; $('harvest-message').textContent = `تعذر استيراد الملف: ${error.message}`; } event.target.value = ''; }; reader.readAsText(file); }
 
 function optionalNumber(id) {
   const raw = $(id).value.trim();
@@ -1096,6 +1137,7 @@ function render(rows, metadata) {
   renderSeasonStatus();
   renderDinSummary(state.din, rows, metadata.referenceDate);
   renderOperations();
+  renderHarvest();
   renderChart(rows);
   renderTable(rows);
   renderDataMessage(rows, metadata.sourceAvailability);
@@ -1148,6 +1190,7 @@ async function init() {
     state.fertilizerMap = fertilizerMap;
     state.fertilizerProfiles = fertilizerProfiles;
     state.operations = readOperations();
+    state.harvest = readHarvest();
     populateCrops(state.catalog);
     populateLocations(state.locations);
     state.din = readDinProfile();
@@ -1158,6 +1201,8 @@ async function init() {
     renderDinSummary(state.din);
     resetOperationForm();
     renderOperations();
+    resetHarvestForm();
+    renderHarvest();
     renderRainEntries(state.din);
     renderIrrigationEntries(state.din);
     $('controls-form').addEventListener('submit', (event) => { event.preventDefault(); refresh(); });
@@ -1180,6 +1225,12 @@ async function init() {
     $('operations-import-open').addEventListener('click', () => $('operations-import-file').click());
     $('operations-import-file').addEventListener('change', importOperations);
     $('operations-body').addEventListener('click', handleOperationTable);
+    $('harvest-form').addEventListener('submit', saveHarvest);
+    $('harvest-reset').addEventListener('click', resetHarvestForm);
+    $('harvest-export').addEventListener('click', exportHarvest);
+    $('harvest-import-open').addEventListener('click', () => $('harvest-import-file').click());
+    $('harvest-import-file').addEventListener('change', importHarvest);
+    $('harvest-body').addEventListener('click', handleHarvestTable);
     $('irrigation-method').addEventListener('change', () => updateEfficiencyHint(true));
     $('fertilizer-water-mode').addEventListener('change', () => renderFertilizerRecommendation(state.din));
     $('fertilizer-tree-age').addEventListener('change', () => renderFertilizerRecommendation(state.din));
@@ -1188,10 +1239,13 @@ async function init() {
       updateRootDepthHint();
       renderSeasonStatus();
       renderOperations();
+      renderHarvest();
     });
-    $('season-start').addEventListener('change', () => { renderSeasonStatus(); renderOperations(); });
-    $('field-name').addEventListener('input', renderOperations);
-    $('field-code').addEventListener('input', renderOperations);
+    $('season-start').addEventListener('change', () => { renderSeasonStatus(); renderOperations(); renderHarvest(); });
+    $('field-name').addEventListener('input', () => { renderOperations(); renderHarvest(); });
+    $('field-code').addEventListener('input', () => { renderOperations(); renderHarvest(); });
+    $('field-area').addEventListener('input', renderHarvest);
+    $('field-area-unit').addEventListener('change', renderHarvest);
     $('weather-date').addEventListener('change', renderSeasonStatus);
     $('location-name').addEventListener('change', () => applyLocation(selectedLocation()));
     await refresh();
