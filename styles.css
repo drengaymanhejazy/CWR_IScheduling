@@ -80,7 +80,7 @@ input:focus, select:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgb
 .season-calendar > div { padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: #fbfcf9; }
 .season-calendar span, .season-calendar strong { display: block; }
 .season-calendar span { color: var(--ink-soft); font-size: 10px; }
-.season-calendar strong { margin-top: 2px; color: var(--teal-deep); font-size: 12px; }
+.season-calendar strong { margin-top: 2px; color: var(--teal-deep); font-size: 10px; line-height: 1.35; white-space: normal; }
 .season-calendar .season-end-cell { background: #fffaf1; border-color: #f0d9b3; }
 .season-calendar .season-end-cell strong { color: #8b5d13; }
 .calendar-empty { opacity: .7; }
@@ -119,7 +119,9 @@ input:focus, select:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgb
 .din-balance strong { margin-top: 3px; color: var(--teal-deep); font: 600 18px 'Space Grotesk', sans-serif; direction: ltr; text-align: right; }
 .din-balance small { margin-top: 2px; color: #7b8d85; font-size: 9px; }
 .din-fertilizer-output { margin-top: 16px; padding: 18px; border: 1px solid #eadfc7; border-radius: 17px; background: linear-gradient(135deg, #fffaf0, #fffdf8); }
-.fertilizer-controls { display: grid; grid-template-columns: 180px 180px minmax(0, 1fr); align-items: end; gap: 10px; margin-top: 12px; }
+.fertilizer-controls { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: end; gap: 10px; margin-top: 12px; }
+.fertilizer-context { min-height: 42px; padding: 7px 11px; border: 1px solid #e9dfcb; border-radius: 10px; background: #fff; }
+.fertilizer-context span, .fertilizer-context strong { display: block; }.fertilizer-context span { color: var(--ink-soft); font-size: 10px; }.fertilizer-context strong { margin-top: 2px; color: var(--teal-deep); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fertilizer-profile { min-height: 42px; padding: 7px 11px; border: 1px solid #e9dfcb; border-radius: 10px; background: #fff; }
 .fertilizer-profile span, .fertilizer-profile strong { display: block; }.fertilizer-profile span { color: var(--ink-soft); font-size: 10px; }.fertilizer-profile strong { overflow: hidden; color: #8b5d13; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .fertilizer-diagnosis, .fertilizer-recommendation { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }

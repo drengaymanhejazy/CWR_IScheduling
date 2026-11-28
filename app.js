@@ -245,6 +245,7 @@ function formatIsoDate(isoDate) {
 function defaultDinProfile() {
   return {
     version: '0.1.0',
+    cropId: null,
     field: { name: '', area: null, areaUnit: 'dunum', code: '' },
     soil: { texture: '', rootDepthCm: null, fieldCapacity: null, wiltingPoint: null, mad: null, initialState: 'field_capacity', initialDeficitMm: null, carryoverStorageMm: null, ph: null, ec: null, organicMatter: null, n: null, p: null, k: null },
     irrigation: { method: '', coverageCoefficient: 1, efficiency: null, weeklyRain: null, dailyRain: {}, actualIrrigation: {}, dischargeLph: null, units: null, spacingM: null, coverageM: null, intensityMmHour: null, intervalDays: null },
@@ -258,6 +259,7 @@ function normaliseDinProfile(raw) {
   return {
     ...fallback,
     ...raw,
+    cropId: raw.cropId || null,
     field: { ...fallback.field, ...(raw.field || {}) },
     soil: { ...fallback.soil, ...(raw.soil || {}) },
     irrigation: { ...fallback.irrigation, ...(raw.irrigation || {}), dailyRain: { ...fallback.irrigation.dailyRain, ...((raw.irrigation || {}).dailyRain || {}) }, actualIrrigation: { ...fallback.irrigation.actualIrrigation, ...((raw.irrigation || {}).actualIrrigation || {}) } }
@@ -447,6 +449,7 @@ function optionalNumber(id) {
 function readDinForm() {
   return normaliseDinProfile({
     version: '0.1.0',
+    cropId: $('crop-select').value || null,
     field: {
       name: $('field-name').value.trim(),
       area: optionalNumber('field-area'),
@@ -492,6 +495,7 @@ function assignInput(id, value) {
 
 function populateDinForm(profile) {
   const data = normaliseDinProfile(profile);
+  if (data.cropId && [...$('crop-select').options].some((option) => option.value === data.cropId)) $('crop-select').value = data.cropId;
   assignInput('field-name', data.field.name);
   assignInput('field-area', data.field.area);
   assignInput('field-area-unit', data.field.areaUnit);
@@ -523,7 +527,7 @@ function populateDinForm(profile) {
 
 const dinAreaLabels = { dunum: 'دونم', hectare: 'هكتار', m2: 'م²' };
 const dinTextureLabels = { sandy: 'رملية', loamy: 'طميية', clay_loam: 'طينية مزيجة', clayey: 'طينية' };
-const dinIrrigationLabels = { surface: 'سطحي / أخاديد', sprinkler: 'رذاذ / مرش', drip_gr: 'تنقيط GR', external_emitters: 'نقاطات خارجية', other: 'أخرى' };
+const dinIrrigationLabels = { surface: 'سطحي / أخاديد', sprinkler: 'رذاذ / مرش', drip_gr: 'تنقيط GR', external_emitters: 'نقاطات خارجية', rainfed: 'بعل / مطري', other: 'أخرى' };
 const dinEfficiencyDefaults = { surface: 0.65, sprinkler: 0.75, drip_gr: 0.85, external_emitters: 0.85, other: 0.75 };
 const DIN_KR_DEFAULT = 1;
 
@@ -638,6 +642,17 @@ function updateRootDepthHint() {
     ? `${crop.root_depth_cm_min} سم`
     : `${crop.root_depth_cm_min}–${crop.root_depth_cm_max} سم`;
   $('root-depth-hint').textContent = `المرجع المحلي لـ${crop.name_ar}: ${range} · يمكن تعديله من تحليل الحقل`;
+}
+
+function selectedCrop() {
+  const cropId = state.din?.cropId || $('crop-select')?.value;
+  return state.catalog?.records.find((item) => item.id === cropId) || state.catalog?.records[0] || null;
+}
+
+function rememberSelectedCrop() {
+  const cropId = $('crop-select').value || null;
+  state.din = normaliseDinProfile({ ...(state.din || defaultDinProfile()), cropId });
+  writeDinProfile(state.din);
 }
 
 function renderDinBalance(profile, rows = state.rows, referenceDate = state.referenceDate) {
@@ -823,12 +838,14 @@ function fertilizerUnit(profile) {
 }
 
 function fertilizerRecommendation(profile = state.din) {
-  const crop = state.catalog?.records.find((item) => item.id === $('crop-select').value);
+  const crop = selectedCrop();
   const mapping = state.fertilizerMap?.entries.find((item) => item.crop_id === crop?.id);
   if (!crop || !mapping || !state.fertilizerProfiles) return { status: 'missing', reason: 'لم تُحمّل قاعدة التسميد أو لا يوجد ربط للمحصول.' };
   if (mapping.mapping_status === 'no_direct_profile') return { status: 'blocked', crop, mapping, reason: mapping.notes_ar };
   const category = fertilizerCategory(crop);
-  const mode = $('fertilizer-water-mode')?.value || 'irrigated';
+  const irrigationMethod = profile?.irrigation?.method || '';
+  const mode = irrigationMethod === 'rainfed' ? 'rainfed' : irrigationMethod ? 'irrigated' : null;
+  if (!mode) return { status: 'incomplete', crop, mapping, reason: 'اختر طريقة الري في ملف DIN ليتم اختيار ملف SoilFert المتوافق.' };
   const profileKey = mapping.soilfert_profiles[mode] ? mode : (mapping.default_profile || Object.keys(mapping.soilfert_profiles)[0]);
   const profileName = mapping.soilfert_profiles[profileKey];
   const list = category === 'tree' ? state.fertilizerProfiles.trees : state.fertilizerProfiles.crops;
@@ -857,6 +874,9 @@ function renderFertilizerRecommendation(profile = state.din) {
   const diagnosisNode = $('fertilizer-diagnosis');
   const recommendationNode = $('fertilizer-recommendation');
   if (!status || !state.fertilizerProfiles) return;
+  const crop = selectedCrop();
+  $('fertilizer-crop-name').textContent = crop?.name_ar || '—';
+  $('fertilizer-irrigation-method').textContent = dinIrrigationLabels[profile?.irrigation?.method] || 'غير محددة';
   const result = fertilizerRecommendation(profile);
   profileName.textContent = result.profileName || 'لا يوجد ملف مباشر';
   if (result.status === 'incomplete' || result.status === 'missing') {
@@ -1022,8 +1042,9 @@ function renderSeasonStatus() {
   const detail = $('season-status-detail');
   const info = cropSeasonInfo(crop, start);
   const calendar = $('season-calendar');
-  const setStageDate = (key, value) => { $(`season-${key.toLowerCase()}-date`).textContent = value ? formatIsoDate(value) : '—'; };
-  if (info.stages) info.stages.forEach((stage) => setStageDate(stage.key, stage.endDate));
+  const setStageDate = (key, value) => { const node = $(`season-${key.toLowerCase()}-date`); if (node) node.textContent = value || '—'; };
+  ['L1', 'L2', 'L3', 'L4'].forEach((key) => setStageDate(key, '—'));
+  if (info.stages) info.stages.forEach((stage) => setStageDate(stage.key, `${formatIsoDate(stage.startDate)} – ${formatIsoDate(stage.endDate)}`));
   $('season-end-date').textContent = info.endDate ? formatIsoDate(info.endDate) : '—';
   if (!info.endDate) {
     status.className = 'season-status neutral-season';
@@ -1231,13 +1252,15 @@ async function init() {
     $('harvest-import-open').addEventListener('click', () => $('harvest-import-file').click());
     $('harvest-import-file').addEventListener('change', importHarvest);
     $('harvest-body').addEventListener('click', handleHarvestTable);
-    $('irrigation-method').addEventListener('change', () => updateEfficiencyHint(true));
-    $('fertilizer-water-mode').addEventListener('change', () => renderFertilizerRecommendation(state.din));
+    $('irrigation-method').addEventListener('change', () => { updateEfficiencyHint(true); renderFertilizerRecommendation(readDinForm()); });
+    ['soil-n', 'soil-p', 'soil-k', 'soil-organic-matter'].forEach((id) => $(id).addEventListener('input', () => renderFertilizerRecommendation(readDinForm())));
     $('fertilizer-tree-age').addEventListener('change', () => renderFertilizerRecommendation(state.din));
     $('crop-select').addEventListener('change', () => {
+      rememberSelectedCrop();
       $('crop-summary').textContent = state.catalog.records.find((crop) => crop.id === $('crop-select').value)?.name_ar || '—';
       updateRootDepthHint();
       renderSeasonStatus();
+      renderFertilizerRecommendation(state.din);
       renderOperations();
       renderHarvest();
     });

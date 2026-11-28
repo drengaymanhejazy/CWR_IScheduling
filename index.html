@@ -188,6 +188,7 @@
                     <option value="sprinkler">رذاذ / مرش</option>
                     <option value="drip_gr">تنقيط GR</option>
                     <option value="external_emitters">نقاطات خارجية</option>
+                    <option value="rainfed">بعل / مطري</option>
                     <option value="other">طريقة أخرى</option>
                   </select>
                 </label>
@@ -240,9 +241,10 @@
         </div>
         <div class="din-fertilizer-output" aria-live="polite">
           <div class="din-output-heading"><div><span class="notice-kicker">محرك التسميد · SoilFert</span><h3>توصية سمادية إرشادية من تحليل التربة</h3></div><span id="fertilizer-status" class="status-pill neutral">بانتظار تحليل التربة</span></div>
-          <p id="fertilizer-note" class="din-output-note">تُستخدم قيم N/P/K والمادة العضوية المدخلة لتشخيص الخصوبة وربط المحصول بملف SoilFert. لا تُصدر توصية تنفيذية إذا لم يوجد ملف مطابق.</p>
+          <p id="fertilizer-note" class="din-output-note">يستخدم هذا المحرك المحصول المختار في الإعدادات العامة وطريقة الري المحفوظة في ملف DIN، ثم يطابقهما مع تحليل التربة وملف SoilFert المحلي.</p>
           <div class="fertilizer-controls">
-            <label><span>نمط الحقل</span><select id="fertilizer-water-mode"><option value="irrigated">مروي</option><option value="rainfed">بعل</option></select></label>
+            <div class="fertilizer-context"><span>المحصول المعتمد</span><strong id="fertilizer-crop-name">—</strong></div>
+            <div class="fertilizer-context"><span>طريقة الري المعتمدة</span><strong id="fertilizer-irrigation-method">—</strong></div>
             <label><span>عمر الأشجار</span><select id="fertilizer-tree-age"><option value="mature">بالغة مثمرة</option><option value="intermediate">متوسطة العمر</option><option value="young">فتية</option></select></label>
             <div class="fertilizer-profile"><span>ملف SoilFert المستخدم</span><strong id="fertilizer-profile-name">—</strong></div>
           </div>
