@@ -4,7 +4,8 @@ const LOCATION_DATA_URL = '/data/locations_syria_v0.1.json';
 const FERTILIZER_MAP_URL = '/data/fertilizer_crop_map_v0.1.json';
 const FERTILIZER_PROFILES_URL = '/data/fertilizer_profiles_soilfert_v0.1.json';
 const DIN_STORAGE_KEY = 'cwr-din-profile-v0.1';
-const state = { catalog: null, locations: null, fertilizerMap: null, fertilizerProfiles: null, rows: [], referenceDate: null, loading: false, din: null };
+const OPERATIONS_STORAGE_KEY = 'cwr-production-operations-costs-v0.1';
+const state = { catalog: null, locations: null, fertilizerMap: null, fertilizerProfiles: null, rows: [], referenceDate: null, loading: false, din: null, operations: [] };
 
 const $ = (id) => document.getElementById(id);
 const numberOrNull = (value) => {
@@ -276,6 +277,123 @@ function writeDinProfile(profile) {
   } catch (error) {
     console.warn('تعذر حفظ ملف DIN في جلسة المتصفح.', error);
   }
+}
+
+function operationId() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return `op-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function readOperations() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(OPERATIONS_STORAGE_KEY) || '[]');
+    return Array.isArray(raw) ? raw.filter((record) => record && typeof record === 'object') : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function writeOperations(records) {
+  try { localStorage.setItem(OPERATIONS_STORAGE_KEY, JSON.stringify(records)); }
+  catch (error) { console.warn('تعذر حفظ سجل العمليات محليًا.', error); }
+}
+
+function operationLabels() { return { land_preparation: 'تجهيز الأرض', planting: 'زراعة', transplanting: 'شتل', irrigation: 'ري', fertilization: 'تسميد', spraying: 'رش', weeding: 'تعشيب', pruning: 'تقليم', harvesting: 'حصاد', sorting: 'فرز', packaging: 'تعبئة', transport: 'نقل', storage: 'تخزين', other: 'أخرى' }; }
+function operationInputLabels() { return { water: 'ماء', energy: 'طاقة', fertilizer: 'سماد', pesticide: 'مبيد', seed: 'بذار', seedling: 'شتول', labor: 'عمالة', machinery: 'آلة', packaging: 'عبوة', transport_service: 'خدمة نقل', other: 'أخرى' }; }
+function operationStatusLabels() { return { planned: 'مخطط', estimated: 'تقديري', actual: 'فعلي', cancelled: 'ملغى', superseded: 'مستبدل' }; }
+function operationSourceLabels() { return { user: 'المستخدم', invoice: 'فاتورة', advisor: 'مرشد', local_table: 'جدول محلي', history: 'سجل سابق', model: 'نموذج', other: 'أخرى' }; }
+
+function currentOperationContext() {
+  const crop = state.catalog?.records.find((item) => item.id === $('crop-select').value);
+  const fieldName = $('field-code').value.trim() || $('field-name').value.trim() || 'field-unnamed';
+  const fieldId = `field:${fieldName}`;
+  const cropId = crop?.id || $('crop-select').value || null;
+  const seasonStart = $('season-start').value || null;
+  return { fieldId, fieldName, cropId, seasonStart, seasonId: `${fieldId}:${cropId || 'crop-unnamed'}:${seasonStart || 'season-unnamed'}` };
+}
+
+function currentOperationRecords() {
+  const context = currentOperationContext();
+  return state.operations.filter((record) => record.field_id === context.fieldId && record.season_id === context.seasonId);
+}
+
+function operationMoneyTotals(records, status) {
+  const totals = {};
+  records.filter((record) => record.record_status === status && record.total_cost != null && record.currency).forEach((record) => { totals[record.currency] = (totals[record.currency] || 0) + Number(record.total_cost); });
+  return Object.entries(totals).map(([currency, amount]) => `${formatNumber(amount, 2)} ${currency}`).join(' · ') || '—';
+}
+
+function resetOperationForm() {
+  $('operation-edit-id').value = '';
+  $('operation-date').value = state.referenceDate || damascusToday();
+  $('operation-type').value = 'land_preparation'; $('operation-input-type').value = 'other'; $('operation-status').value = 'planned';
+  $('operation-quantity').value = ''; $('operation-unit').value = 'kg'; $('operation-unit-price').value = ''; $('operation-currency').value = '';
+  $('operation-additional').value = '0'; $('operation-discount').value = '0'; $('operation-cost-basis').value = 'direct'; $('operation-source-type').value = 'user'; $('operation-description').value = '';
+  $('operation-submit').textContent = 'إضافة السجل';
+}
+
+function renderOperationMetrics(records) {
+  $('operations-total-actual').textContent = operationMoneyTotals(records, 'actual');
+  $('operations-total-estimated').textContent = operationMoneyTotals(records, 'estimated');
+  $('operations-total-planned').textContent = operationMoneyTotals(records, 'planned');
+  $('operations-count').textContent = String(records.filter((record) => !['cancelled', 'superseded'].includes(record.record_status)).length);
+  const status = $('operations-status'); status.className = `status-pill ${records.length ? 'success' : 'neutral'}`; status.textContent = records.length ? `${records.length} سجل محلي` : 'لا توجد سجلات';
+}
+
+function renderOperations() {
+  const records = currentOperationRecords().sort((a, b) => String(b.event_date).localeCompare(String(a.event_date)) || String(b.created_at).localeCompare(String(a.created_at)));
+  renderOperationMetrics(records);
+  const body = $('operations-body');
+  if (!records.length) { body.innerHTML = '<tr><td colspan="7" class="table-empty">لا توجد سجلات لهذا الحقل والموسم.</td></tr>'; return; }
+  const operationNames = operationLabels(); const inputNames = operationInputLabels(); const statuses = operationStatusLabels(); const sources = operationSourceLabels();
+  body.innerHTML = records.map((record) => {
+    const cost = record.total_cost != null && record.currency ? `<span class="operation-cost">${formatNumber(record.total_cost, 2)}<small>${escapeHtml(record.currency)}</small></span>` : '—';
+    const action = record.record_status === 'cancelled' ? 'ملغى' : `<button type="button" class="table-action operation-edit" data-operation-action="edit" data-operation-id="${escapeHtml(record.operation_id)}">تعديل</button><button type="button" class="table-action" data-operation-action="cancel" data-operation-id="${escapeHtml(record.operation_id)}">إلغاء</button>`;
+    return `<tr><td class="table-date">${escapeHtml(formatIsoDate(record.event_date))}</td><td><b>${escapeHtml(operationNames[record.operation_type] || record.operation_type)}</b><small>${escapeHtml(inputNames[record.input_type] || record.input_type)}${record.description ? ` · ${escapeHtml(record.description)}` : ''}</small></td><td><span class="operation-status-chip ${escapeHtml(record.record_status)}">${escapeHtml(statuses[record.record_status] || record.record_status)}</span></td><td class="num">${record.quantity != null ? `${formatNumber(record.quantity, 3)} ${escapeHtml(record.unit || '')}` : '—'}</td><td>${cost}</td><td>${escapeHtml(sources[record.source_type] || record.source_type)}${record.source_ref ? `<small>${escapeHtml(record.source_ref)}</small>` : ''}</td><td>${action}</td></tr>`;
+  }).join('');
+}
+
+function saveOperation(event) {
+  event.preventDefault();
+  const quantity = optionalNumber('operation-quantity'); const unitPrice = optionalNumber('operation-unit-price');
+  const additionalCost = optionalNumber('operation-additional') ?? 0; const discount = optionalNumber('operation-discount') ?? 0; const currency = $('operation-currency').value.trim();
+  if (unitPrice != null && (quantity == null || !currency)) { $('operation-message').className = 'data-message error-message'; $('operation-message').textContent = 'عند إدخال سعر وحدي يجب إدخال الكمية والعملة أيضًا.'; return; }
+  if (additionalCost < 0 || discount < 0 || !$('operation-date').value) return;
+  const context = currentOperationContext(); const now = new Date().toISOString(); const editId = $('operation-edit-id').value; const previous = state.operations.find((record) => record.operation_id === editId);
+  const subtotal = quantity != null && unitPrice != null ? quantity * unitPrice : null; const totalCost = subtotal != null ? subtotal + additionalCost - discount : null;
+  const record = { operation_id: editId || operationId(), field_id: context.fieldId, season_id: context.seasonId, crop_id: context.cropId, operation_type: $('operation-type').value, input_type: $('operation-input-type').value, description: $('operation-description').value.trim(), event_date: $('operation-date').value, planned_or_actual: $('operation-status').value, record_status: $('operation-status').value, quantity, unit: $('operation-unit').value, unit_price: unitPrice, currency: currency || null, subtotal: subtotal == null ? null : round(subtotal, 4), additional_cost: round(additionalCost, 4), discount: round(discount, 4), total_cost: totalCost == null ? null : round(totalCost, 4), cost_basis: $('operation-cost-basis').value, allocation_method: $('operation-cost-basis').value === 'allocated' ? 'custom' : 'none', source_type: $('operation-source-type').value, source_ref: $('operation-description').value.trim() || null, linked_record_ids: previous?.linked_record_ids || [], notes: null, created_at: previous?.created_at || now, updated_at: now };
+  const index = state.operations.findIndex((item) => item.operation_id === record.operation_id);
+  if (index >= 0) state.operations[index] = record; else state.operations.push(record);
+  writeOperations(state.operations); resetOperationForm(); renderOperations(); $('operation-message').className = 'data-message neutral-message'; $('operation-message').textContent = 'تم حفظ السجل محليًا. لا يدخل التقديري أو المخطط في مؤشرات التكلفة الفعلية.';
+}
+
+function editOperation(record) {
+  $('operation-edit-id').value = record.operation_id; $('operation-date').value = record.event_date || ''; $('operation-type').value = record.operation_type || 'other'; $('operation-input-type').value = record.input_type || 'other'; $('operation-status').value = ['planned', 'estimated', 'actual'].includes(record.record_status) ? record.record_status : 'estimated'; $('operation-quantity').value = record.quantity ?? ''; $('operation-unit').value = record.unit || 'kg'; $('operation-unit-price').value = record.unit_price ?? ''; $('operation-currency').value = record.currency || ''; $('operation-additional').value = record.additional_cost ?? 0; $('operation-discount').value = record.discount ?? 0; $('operation-cost-basis').value = record.cost_basis || 'direct'; $('operation-source-type').value = record.source_type || 'user'; $('operation-description').value = record.description || record.source_ref || ''; $('operation-submit').textContent = 'حفظ تعديل السجل'; $('operation-form').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function handleOperationTable(event) {
+  const button = event.target.closest('[data-operation-action]'); if (!button) return;
+  const record = state.operations.find((item) => item.operation_id === button.dataset.operationId); if (!record) return;
+  if (button.dataset.operationAction === 'edit') editOperation(record);
+  if (button.dataset.operationAction === 'cancel') { record.record_status = 'cancelled'; record.planned_or_actual = 'actual'; record.updated_at = new Date().toISOString(); writeOperations(state.operations); renderOperations(); }
+}
+
+function exportOperations() {
+  const context = currentOperationContext(); const payload = { schema_version: 'production_operations_costs_v0.1', record_type: 'production_operations_costs', exported_at: new Date().toISOString(), identity: context, records: currentOperationRecords() };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `production_operations_${context.seasonId.replace(/[^a-z0-9_-]+/gi, '_')}.json`; link.click(); URL.revokeObjectURL(url);
+}
+
+function importOperations(event) {
+  const file = event.target.files?.[0]; if (!file) return; const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const parsed = JSON.parse(reader.result); const records = Array.isArray(parsed) ? parsed : parsed.records; if (!Array.isArray(records)) throw new Error('لا توجد قائمة records صالحة.');
+      const context = currentOperationContext(); const valid = records.filter((record) => record && record.operation_id && record.field_id === context.fieldId && record.season_id === context.seasonId && record.event_date); const existingIds = new Set(state.operations.map((record) => record.operation_id));
+      valid.forEach((record) => { if (existingIds.has(record.operation_id)) { const index = state.operations.findIndex((item) => item.operation_id === record.operation_id); state.operations[index] = record; } else state.operations.push(record); });
+      writeOperations(state.operations); renderOperations(); $('operation-message').className = 'data-message neutral-message'; $('operation-message').textContent = `تم استيراد ${valid.length} سجلًا مطابقًا للحقل والموسم الحاليين.`;
+    } catch (error) { $('operation-message').className = 'data-message error-message'; $('operation-message').textContent = `تعذر استيراد الملف: ${error.message}`; }
+    event.target.value = '';
+  }; reader.readAsText(file);
 }
 
 function optionalNumber(id) {
@@ -977,6 +1095,7 @@ function render(rows, metadata) {
   renderSummary(rows, metadata.today);
   renderSeasonStatus();
   renderDinSummary(state.din, rows, metadata.referenceDate);
+  renderOperations();
   renderChart(rows);
   renderTable(rows);
   renderDataMessage(rows, metadata.sourceAvailability);
@@ -1028,6 +1147,7 @@ async function init() {
     state.locations = locations;
     state.fertilizerMap = fertilizerMap;
     state.fertilizerProfiles = fertilizerProfiles;
+    state.operations = readOperations();
     populateCrops(state.catalog);
     populateLocations(state.locations);
     state.din = readDinProfile();
@@ -1036,6 +1156,8 @@ async function init() {
     updateEfficiencyHint();
     renderSeasonStatus();
     renderDinSummary(state.din);
+    resetOperationForm();
+    renderOperations();
     renderRainEntries(state.din);
     renderIrrigationEntries(state.din);
     $('controls-form').addEventListener('submit', (event) => { event.preventDefault(); refresh(); });
@@ -1052,6 +1174,12 @@ async function init() {
     $('irrigation-modal-close').addEventListener('click', () => $('irrigation-modal').close());
     $('irrigation-modal').addEventListener('click', (event) => { if (event.target === $('irrigation-modal')) $('irrigation-modal').close(); });
     $('soil-carryover-save').addEventListener('click', saveSoilCarryover);
+    $('operation-form').addEventListener('submit', saveOperation);
+    $('operation-reset').addEventListener('click', resetOperationForm);
+    $('operations-export').addEventListener('click', exportOperations);
+    $('operations-import-open').addEventListener('click', () => $('operations-import-file').click());
+    $('operations-import-file').addEventListener('change', importOperations);
+    $('operations-body').addEventListener('click', handleOperationTable);
     $('irrigation-method').addEventListener('change', () => updateEfficiencyHint(true));
     $('fertilizer-water-mode').addEventListener('change', () => renderFertilizerRecommendation(state.din));
     $('fertilizer-tree-age').addEventListener('change', () => renderFertilizerRecommendation(state.din));
@@ -1059,8 +1187,11 @@ async function init() {
       $('crop-summary').textContent = state.catalog.records.find((crop) => crop.id === $('crop-select').value)?.name_ar || '—';
       updateRootDepthHint();
       renderSeasonStatus();
+      renderOperations();
     });
-    $('season-start').addEventListener('change', renderSeasonStatus);
+    $('season-start').addEventListener('change', () => { renderSeasonStatus(); renderOperations(); });
+    $('field-name').addEventListener('input', renderOperations);
+    $('field-code').addEventListener('input', renderOperations);
     $('weather-date').addEventListener('change', renderSeasonStatus);
     $('location-name').addEventListener('change', () => applyLocation(selectedLocation()));
     await refresh();

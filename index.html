@@ -269,6 +269,41 @@
         </div>
       </section>
 
+      <section class="panel operations-panel" aria-labelledby="operations-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">الإنتاج والاقتصاد · المرحلة A</p>
+            <h2 id="operations-title">سجل العمليات والتكاليف</h2>
+            <p class="section-lead">سجل محلي منفصل عن حسابات الري والتسميد. يفصل النموذج بين المخطط والتقديري والفعلي، ويحفظ مصدر الكمية أو التكلفة.</p>
+          </div>
+          <span id="operations-status" class="status-pill neutral">لا توجد سجلات</span>
+        </div>
+        <form id="operation-form" class="operation-form">
+          <input id="operation-edit-id" type="hidden" />
+          <div class="operation-fields">
+            <label><span>تاريخ العملية</span><input id="operation-date" type="date" required /></label>
+            <label><span>نوع العملية</span><select id="operation-type" required>
+              <option value="land_preparation">تجهيز الأرض</option><option value="planting">زراعة</option><option value="transplanting">شتل</option><option value="irrigation">ري</option><option value="fertilization">تسميد</option><option value="spraying">رش</option><option value="weeding">تعشيب</option><option value="pruning">تقليم</option><option value="harvesting">حصاد</option><option value="sorting">فرز</option><option value="packaging">تعبئة</option><option value="transport">نقل</option><option value="storage">تخزين</option><option value="other">أخرى</option>
+            </select></label>
+            <label><span>المدخل / الخدمة</span><select id="operation-input-type"><option value="water">ماء</option><option value="energy">طاقة</option><option value="fertilizer">سماد</option><option value="pesticide">مبيد</option><option value="seed">بذار</option><option value="seedling">شتول</option><option value="labor">عمالة</option><option value="machinery">آلة</option><option value="packaging">عبوة</option><option value="transport_service">خدمة نقل</option><option value="other">أخرى</option></select></label>
+            <label><span>حالة السجل</span><select id="operation-status"><option value="planned">مخطط</option><option value="estimated">تقديري</option><option value="actual">فعلي</option></select></label>
+            <label><span>الكمية</span><input id="operation-quantity" type="number" min="0" step="0.001" placeholder="اختياري" /></label>
+            <label><span>الوحدة</span><select id="operation-unit"><option value="mm">ملم</option><option value="m3">م³</option><option value="l">لتر</option><option value="kg">كغ</option><option value="g">غ</option><option value="ton">طن</option><option value="unit">وحدة</option><option value="hour">ساعة</option><option value="day">يوم</option><option value="trip">نقلة</option><option value="package">عبوة</option><option value="service">خدمة</option></select></label>
+            <label><span>السعر الوحدي</span><input id="operation-unit-price" type="number" min="0" step="0.0001" placeholder="اختياري" /></label>
+            <label><span>العملة</span><input id="operation-currency" type="text" maxlength="8" placeholder="مثال: SYP" /></label>
+            <label><span>تكلفة إضافية</span><input id="operation-additional" type="number" min="0" step="0.01" value="0" /></label>
+            <label><span>الحسم</span><input id="operation-discount" type="number" min="0" step="0.01" value="0" /></label>
+            <label><span>أساس التكلفة</span><select id="operation-cost-basis"><option value="direct">مباشرة</option><option value="allocated">موزعة</option><option value="imputed">ضمنية</option></select></label>
+            <label><span>مصدر السجل</span><select id="operation-source-type"><option value="user">إدخال المستخدم</option><option value="invoice">فاتورة</option><option value="advisor">مرشد</option><option value="local_table">جدول محلي</option><option value="history">سجل سابق</option><option value="model">نموذج تقديري</option><option value="other">أخرى</option></select></label>
+            <label class="operation-wide"><span>وصف أو مرجع المصدر <small class="optional-label">اختياري</small></span><input id="operation-description" type="text" placeholder="مثال: فاتورة أو ملاحظة التنفيذ" /></label>
+          </div>
+          <div class="operation-actions"><button class="primary-button" type="submit" id="operation-submit">إضافة السجل</button><button class="secondary-button" type="button" id="operation-reset">تفريغ النموذج</button><button class="secondary-button" type="button" id="operations-export">تصدير JSON</button><button class="secondary-button" type="button" id="operations-import-open">استيراد JSON</button><input id="operations-import-file" type="file" accept="application/json,.json" hidden /><small>يحفظ محليًا في هذا المتصفح فقط.</small></div>
+          <div id="operation-message" class="data-message neutral-message">أدخل عملية مرتبطة بالحقل والموسم الحاليين.</div>
+        </form>
+        <div class="operation-metrics" aria-live="polite"><div><span>فعلي</span><strong id="operations-total-actual">—</strong><small>حسب العملة المسجلة</small></div><div><span>تقديري</span><strong id="operations-total-estimated">—</strong><small>لا يمثل حقيقة تنفيذية</small></div><div><span>مخطط</span><strong id="operations-total-planned">—</strong><small>قبل التنفيذ</small></div><div><span>عدد السجلات</span><strong id="operations-count">0</strong><small>للحقل والموسم الحاليين</small></div></div>
+        <div class="table-scroll operations-table-wrap"><table><thead><tr><th>التاريخ</th><th>العملية / المدخل</th><th>الحالة</th><th>الكمية</th><th>التكلفة</th><th>المصدر</th><th>الإجراء</th></tr></thead><tbody id="operations-body"><tr><td colspan="7" class="table-empty">لا توجد سجلات لهذا الحقل والموسم.</td></tr></tbody></table></div>
+      </section>
+
       <dialog id="rain-modal" class="rain-modal">
         <form id="rain-entry-form" method="dialog">
           <div class="rain-modal-heading"><div><span class="notice-kicker">بيانات الحقل</span><h2>إدخال المطر اليومي</h2></div><button id="rain-modal-close" class="modal-close" type="button" aria-label="إغلاق">×</button></div>
