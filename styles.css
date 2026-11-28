@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&family=Tajawal:wght@400;500;700;800&display=swap');
 
 :root {
   --ink: #172321;
@@ -24,7 +24,7 @@ body {
   margin: 0;
   color: var(--ink);
   background: var(--paper);
-  font-family: 'IBM Plex Sans Arabic', Tahoma, sans-serif;
+  font-family: 'Al Jazeera Arabic', 'Jazeera', 'Tajawal', 'Noto Kufi Arabic', Tahoma, sans-serif;
   line-height: 1.6;
 }
 button, input, select { font: inherit; }
@@ -36,13 +36,15 @@ button { cursor: pointer; }
 .brand strong, .brand small { display: block; }
 .brand strong { font-size: 16px; letter-spacing: -.3px; }
 .brand small { color: var(--ink-soft); font-size: 11px; }
+.brand-en { margin-top: 1px; color: #8b9993 !important; font: 500 9px/1.2 'Inter', Arial, sans-serif !important; letter-spacing: .15px; }
 .topbar-meta { color: var(--ink-soft); display: flex; align-items: center; gap: 8px; font-size: 12px; }
 .live-dot, .tiny-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #2da771; box-shadow: 0 0 0 4px #dff3e8; }
 .hero { position: relative; overflow: hidden; display: flex; align-items: flex-end; justify-content: space-between; gap: 36px; min-height: 282px; padding: 48px 52px 44px; border-radius: 28px; background: radial-gradient(circle at 15% 20%, rgba(113, 204, 159, .23), transparent 27%), linear-gradient(112deg, #103f3b, #126c5f 58%, #1a806e); color: #fff; box-shadow: var(--shadow); }
 .hero::after { content: 'ET₀'; position: absolute; left: 33%; top: -50px; color: rgba(255,255,255,.06); font: 700 240px/1 'Space Grotesk', sans-serif; letter-spacing: -22px; pointer-events: none; }
 .hero-copy, .hero-stamp { position: relative; z-index: 1; }
 .eyebrow { margin: 0 0 6px; color: var(--gold); font: 600 10px/1.3 'Space Grotesk', sans-serif; letter-spacing: 1.4px; text-transform: uppercase; }
-.hero h1 { max-width: 650px; margin: 0; font-size: clamp(34px, 5vw, 68px); line-height: 1.05; letter-spacing: -2px; }
+.hero h1 { max-width: 760px; margin: 0; font-size: clamp(34px, 5vw, 68px); line-height: 1.05; letter-spacing: -2px; }
+.hero-title-en { display: block; margin-top: 13px; color: rgba(255,255,255,.64); font: 500 clamp(12px, 1.45vw, 17px)/1.25 'Inter', Arial, sans-serif; letter-spacing: .2px; direction: ltr; text-align: right; }
 .hero-text { max-width: 640px; margin: 22px 0 0; color: rgba(255,255,255,.78); font-size: 16px; }
 .hero-stamp { min-width: 222px; padding: 18px 20px; border: 1px solid rgba(255,255,255,.2); border-radius: 18px; background: rgba(255,255,255,.09); backdrop-filter: blur(12px); }
 .hero-stamp span, .hero-stamp small { display: block; color: rgba(255,255,255,.7); font-size: 11px; }
@@ -178,7 +180,7 @@ input:focus, select:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgb
 .legend-line { width: 17px; height: 3px; display: inline-block; border-radius: 9px; }.et0-line { background: var(--teal); }.etc-line { background: var(--gold); }
 .chart-wrap { min-height: 250px; display: grid; place-items: center; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .chart-wrap svg { width: 100%; height: 250px; overflow: visible; }
-.chart-grid { stroke: #e7ece7; stroke-width: 1; }.chart-label { fill: #71807b; font: 10px 'IBM Plex Sans Arabic', sans-serif; }.chart-axis-label { fill: #93a19c; font: 9px 'IBM Plex Sans Arabic', sans-serif; }.chart-point { stroke: white; stroke-width: 2; }
+.chart-grid { stroke: #e7ece7; stroke-width: 1; }.chart-label { fill: #71807b; font: 10px 'Tajawal', Tahoma, sans-serif; }.chart-axis-label { fill: #93a19c; font: 9px 'Tajawal', Tahoma, sans-serif; }.chart-point { stroke: white; stroke-width: 2; }
 .chart-footnote { display: flex; align-items: center; gap: 8px; margin-top: 14px; color: var(--ink-soft); font-size: 11px; }
 .empty-state { padding: 26px; color: var(--ink-soft); font-size: 12px; }
 .din-soil-chart { min-height: 230px; margin-top: 14px; overflow-x: auto; border: 1px solid #e7eadf; border-radius: 12px; background: #fff; }
@@ -187,7 +189,7 @@ input:focus, select:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgb
 .soil-water-point { fill: var(--teal); stroke: #fff; stroke-width: 2; }
 .soil-taw-line { stroke: var(--teal-deep); stroke-width: 1.5; stroke-dasharray: 5 4; opacity: .65; }
 .soil-raw-line { stroke: var(--gold); stroke-width: 1.5; stroke-dasharray: 3 4; opacity: .8; }
-.soil-chart-note, .chart-label { fill: #71807b; font: 10px 'IBM Plex Sans Arabic', sans-serif; }
+.soil-chart-note, .chart-label { fill: #71807b; font: 10px 'Tajawal', Tahoma, sans-serif; }
 .din-daily-actions { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
 .din-daily-actions small { color: var(--ink-soft); font-size: 10px; }
 .operations-panel { margin-top: 16px; padding: 24px 26px 22px; }
@@ -210,7 +212,7 @@ input:focus, select:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgb
 .operation-status-chip.planned { background: var(--blue-soft); color: #1e638d; }
 .operation-status-chip.cancelled, .operation-status-chip.superseded { background: var(--rose-soft); color: #8e3d3c; }
 .operation-cost { direction: ltr; text-align: right; font-family: 'Space Grotesk', sans-serif; }
-.operation-cost small { display: block; color: #87948f; font: 10px 'IBM Plex Sans Arabic', sans-serif; }
+.operation-cost small { display: block; color: #87948f; font: 10px 'Tajawal', Tahoma, sans-serif; }
 .operation-edit { margin-left: 5px; border-color: #c8dfd1; background: var(--mint); color: var(--teal-deep); }
 .harvest-panel { margin-top: 16px; padding: 24px 26px 22px; }
 .harvest-fields { grid-template-columns: repeat(4, minmax(0, 1fr)); }
